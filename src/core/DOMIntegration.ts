@@ -1,10 +1,12 @@
 /**
  * DOM Integration Layer
  * Connects the new modular architecture to existing HTML elements
+ * Now uses ReactiveShowManager for automatic UI updates
  */
 
 import { logger } from '../utils/logger.js';
 import { ShowManager } from '../modules/showManager.js';
+import { ReactiveShowManager } from '../state/ReactiveShowManager.js';
 import { Show } from '../types/index.js';
 
 export interface DOMElements {
@@ -34,16 +36,22 @@ export interface ViewMode {
 
 /**
  * DOM Integration class for managing UI interactions
+ * Now reactive - automatically updates UI when state changes
  */
 export class DOMIntegration {
   private elements: DOMElements;
   private viewMode: ViewMode;
   private searchTerm = '';
   private debounceTimer: number | null = null;
-  private showManager: ShowManager;
+  private showManager: ShowManager; // Legacy - kept for backward compatibility
+  private reactiveShowManager?: ReactiveShowManager;
+  private unsubscribers: Array<() => void> = [];
 
-  constructor(showManager: ShowManager) {
+  constructor(showManager: ShowManager, reactiveShowManager?: ReactiveShowManager) {
     this.showManager = showManager;
+    if (reactiveShowManager) {
+      this.reactiveShowManager = reactiveShowManager;
+    }
     this.elements = this.getElements();
     this.viewMode = {
       current: 'all',
@@ -57,6 +65,15 @@ export class DOMIntegration {
   init(): void {
     try {
       this.setupEventListeners();
+      
+      // Setup reactive subscriptions if ReactiveShowManager is available
+      if (this.reactiveShowManager) {
+        this.setupReactiveSubscriptions();
+        logger.info('Reactive subscriptions enabled');
+      } else {
+        logger.warn('ReactiveShowManager not available - using legacy mode');
+      }
+      
       this.setMode('all'); // Start with "All Shows" view
       
       // Render legend and editor with individual error handling
@@ -77,6 +94,48 @@ export class DOMIntegration {
       logger.error('Failed to initialize DOM integration', error);
       throw error;
     }
+  }
+
+  /**
+   * Setup reactive subscriptions for automatic UI updates
+   */
+  private setupReactiveSubscriptions(): void {
+    if (!this.reactiveShowManager) {
+      return;
+    }
+
+    // Subscribe to filtered shows changes - updates both All Shows and Week views
+    const unsubFilteredShows = this.reactiveShowManager.subscribeToFilteredShows(() => {
+      logger.debug('Filtered shows changed - updating current view');
+      if (this.viewMode.current === 'all') {
+        this.renderAllShows();
+      } else {
+        this.renderWeekView();
+      }
+      this.renderLegend(); // Update legend when shows change
+    });
+    this.unsubscribers.push(unsubFilteredShows);
+
+    // Subscribe to show changes - updates editor
+    const unsubShows = this.reactiveShowManager.subscribeToShows(() => {
+      logger.debug('Shows changed - updating editor');
+      this.renderEditor();
+    });
+    this.unsubscribers.push(unsubShows);
+
+    // Subscribe to filter changes - updates all views
+    const unsubFilters = this.reactiveShowManager.subscribeToFilters(() => {
+      logger.debug('Filters changed - updating views');
+      if (this.viewMode.current === 'all') {
+        this.renderAllShows();
+      } else {
+        this.renderWeekView();
+      }
+      this.renderLegend();
+    });
+    this.unsubscribers.push(unsubFilters);
+
+    logger.info('Reactive subscriptions setup complete');
   }
 
   /**
@@ -832,6 +891,10 @@ export class DOMIntegration {
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
     }
+
+    // Cleanup reactive subscriptions
+    this.unsubscribers.forEach(unsub => unsub());
+    this.unsubscribers = [];
 
     // Event listeners will be automatically removed when elements are removed
     logger.info('DOM integration destroyed');

@@ -84,7 +84,7 @@ const reactiveShowManager = new ReactiveShowManager(shows, {
   enableHistory: true,
   maxHistorySize: 50,
 });
-const domIntegration = new DOMIntegration(showManager);
+const domIntegration = new DOMIntegration(showManager, reactiveShowManager);
 
 /**
  * Apply preloaded season data to shows
