@@ -6,6 +6,7 @@
 import { SeasonData, ShowDatabase } from './types/index.js';
 import { Application } from './core/Application.js';
 import { ShowManager } from './modules/showManager.js';
+import { DOMIntegration } from './core/DOMIntegration.js';
 import { logger } from './utils/logger.js';
 
 // Show database - this will eventually be moved to a data module
@@ -76,6 +77,7 @@ const preloadSeasonData: Record<string, SeasonData> = {
 // Application instances
 const app = new Application(shows);
 const showManager = new ShowManager(shows);
+const domIntegration = new DOMIntegration(showManager);
 
 /**
  * Apply preloaded season data to shows
@@ -102,6 +104,9 @@ const legacyApp = {
       
       // Initialize the new modular application
       await app.init();
+      
+      // Initialize DOM integration for UI interactions
+      domIntegration.init();
       
       logger.info('Application started using new modular architecture');
     } catch (error) {

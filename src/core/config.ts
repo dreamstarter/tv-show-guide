@@ -30,7 +30,7 @@ export const CONFIG: AppConfig = {
   PLATFORMS: ['hulu', 'peacock', 'paramount'] as const,
   STORAGE_KEY: 'showsSeasonData',
   APP_VERSION: '1.0.0',
-  DEVELOPMENT_MODE: process.env.NODE_ENV === 'development'
+  DEVELOPMENT_MODE: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
 } as const;
 
 /**

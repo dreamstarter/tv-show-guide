@@ -436,6 +436,136 @@ thead th {
   }
 }
 
+/* Week Schedule Specific Styles */
+.week-schedule {
+  margin: 0;
+}
+
+.week-table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.week-table th {
+  text-align: center;
+  font-weight: 600;
+  padding: var(--spacing-md) var(--spacing-sm);
+  width: 14.28%; /* Equal width for 7 days */
+}
+
+.week-table .day-count {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: normal;
+}
+
+.week-table .show-cell {
+  padding: var(--spacing-sm);
+  border: 1px solid var(--border);
+  vertical-align: top;
+  min-height: 60px;
+}
+
+.week-table .empty-cell {
+  padding: var(--spacing-sm);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.01);
+  min-height: 60px;
+}
+
+.week-table .show-title {
+  font-weight: 500;
+  margin: var(--spacing-xs) 0;
+  line-height: 1.3;
+}
+
+.week-table .show-title.ended {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.week-table .show-details {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: var(--spacing-xs);
+}
+
+.week-table .meta {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.week-summary {
+  margin-top: var(--spacing-lg);
+  padding: var(--spacing-md);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.week-summary ul {
+  margin: var(--spacing-sm) 0;
+  padding-left: var(--spacing-lg);
+}
+
+.week-summary li {
+  margin: var(--spacing-xs) 0;
+  color: var(--muted);
+}
+
+/* Mobile optimizations for week view */
+@media (max-width: 768px) {
+  .week-table {
+    font-size: 11px;
+    min-width: 700px; /* Ensure enough space for 7 columns */
+  }
+  
+  .week-table th {
+    padding: var(--spacing-sm) 2px;
+    font-size: 11px;
+  }
+  
+  .week-table .day-count {
+    font-size: 9px;
+  }
+  
+  .week-table .show-cell,
+  .week-table .empty-cell {
+    padding: var(--spacing-xs);
+    min-height: 50px;
+  }
+  
+  .week-table .show-title {
+    font-size: 11px;
+  }
+  
+  .week-table .show-details {
+    font-size: 9px;
+  }
+  
+  .week-table .chip {
+    font-size: 8px;
+    padding: 2px 4px;
+  }
+}
+
+@media (max-width: 414px) {
+  .week-table {
+    min-width: 600px;
+  }
+  
+  .week-table th {
+    font-size: 10px;
+    padding: var(--spacing-xs) 1px;
+  }
+  
+  .week-table .day-count {
+    display: block;
+    font-size: 8px;
+  }
+}
+
 /* Chips and spans */
 span {
   display: inline-block;
@@ -457,14 +587,29 @@ span:hover {
   animation: scaleIn 0.2s ease-out;
 }
 
+.hulu::before {
+  content: "📺 ";
+  margin-right: 2px;
+}
+
 .peacock { 
   background: var(--chip-peacock);
   animation: scaleIn 0.2s ease-out 0.1s both;
 }
 
+.peacock::before {
+  content: "🦚 ";
+  margin-right: 2px;
+}
+
 .paramount { 
   background: var(--chip-paramount);
   animation: scaleIn 0.2s ease-out 0.2s both;
+}
+
+.paramount::before {
+  content: "⛰️ ";
+  margin-right: 2px;
 }
 
 /* UI Components */
@@ -640,6 +785,28 @@ span:hover {
   transform: scale(1.15);
   background: #52d4b0;
 }
+
+/* Network logos - using emoji/symbols */
+.abc-logo::before { content: "🅰️"; margin-right: 4px; }
+.nbc-logo::before { content: "🦚"; margin-right: 4px; }
+.cbs-logo::before { content: "👁️"; margin-right: 4px; }
+.fox-logo::before { content: "🦊"; margin-right: 4px; }
+
+.abc-logo, .nbc-logo, .cbs-logo, .fox-logo {
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Alternative text-only style if emoji doesn't work */
+.abc-logo { color: #ffcc00; }
+.nbc-logo { color: #00b0f0; }
+.cbs-logo { color: #0052a3; }
+.fox-logo { color: #ff6b00; }
 
 /* Layout components */
 .toolbar {
@@ -1670,4 +1837,32 @@ html {
     color: black;
     font-weight: bold;
   }
+}
+
+/* Placeholder content styles for new modular architecture */
+.placeholder-content {
+  text-align: center;
+  padding: 3rem 2rem;
+  background: var(--panel);
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  margin: 2rem 0;
+}
+
+.placeholder-content h3 {
+  color: var(--accent);
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+}
+
+.placeholder-content p {
+  color: var(--muted);
+  margin-bottom: 0.5rem;
+  font-size: 1.1rem;
+}
+
+.placeholder-content p:last-child {
+  font-size: 1.2rem;
+  color: var(--accent-2);
+  font-weight: bold;
 }

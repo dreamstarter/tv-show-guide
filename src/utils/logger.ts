@@ -2,9 +2,14 @@
  * Logging utility for the TV Show Guide application
  */
 
+// Browser-compatible development mode detection
+const isDevelopmentMode = (): boolean => {
+  return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+};
+
 export const logger = {
   info: (message: string, ...args: unknown[]): void => {
-    if (process.env.NODE_ENV === 'development') {
+    if (isDevelopmentMode()) {
       // eslint-disable-next-line no-console
       console.log(`[INFO] ${message}`, ...args);
     }
