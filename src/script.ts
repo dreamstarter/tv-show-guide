@@ -4,14 +4,15 @@
  */
 
 import { 
-  Platform, 
-  SearchResult, 
   SeasonData,
   ShowDatabase,
   AppConfiguration
 } from './types/index.js';
 
 import * as ShowValidation from './validation.js';
+import { StorageService } from './services/storageService.js';
+import { StateService } from './services/stateService.js';
+import { logger } from './utils/logger.js';
 
 // Configuration and Constants
 const CONFIG: AppConfiguration = {
@@ -20,6 +21,10 @@ const CONFIG: AppConfiguration = {
   PLATFORMS: ['hulu', 'peacock', 'paramount'] as const,
   STORAGE_KEY: 'showsSeasonData'
 };
+
+// Services
+const storageService = new StorageService(CONFIG.STORAGE_KEY);
+const stateService = new StateService();
 
 // Show database
 const shows: ShowDatabase = {
@@ -57,13 +62,8 @@ const shows: ShowDatabase = {
   32: { t: 'Will Trent', c: 'hulu', net: 'ABC', s: null, start: '', end: '', eps: null, air: 'Tuesday', ret: true }
 };
 
-// State management
-// @ts-ignore - Will be used in full implementation
-let weekOffset: number = 0;
-// @ts-ignore - Will be used in full implementation
-let currentSearchTerm: string = '';
-// @ts-ignore - Will be used in full implementation
-let searchResults: SearchResult[] | null = null;
+// State management (using StateService)
+// appState is now managed by stateService
 
 // Initialize error handler
 const errorHandler = new ShowValidation.ErrorHandler();
@@ -94,60 +94,6 @@ const preloadSeasonData: Record<string, SeasonData> = {
   "12": { "ret": false }, "28": { "ret": false }, "22": { "ret": false },
   "25": { "ret": false }, "24": { "ret": false }, "11": { "ret": false },
   "16": { "ret": false }, "23": { "ret": false }, "26": { "ret": false },
-  "29": { "ret": false }
-};
-
-// Utility Functions
-const utils = {
-  createElement: (tagName: string, className?: string, content?: string): HTMLElement => {
-    const element = document.createElement(tagName);
-    if (className) element.className = className;
-    if (content) element.textContent = content;
-    return element;
-  },
-
-  pad: (n: number): string => (n < 10 ? '0' : '') + n,
-
-  formatDate: (d: Date): string => {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
-  },
-
-  startOfWeek: (d: Date): Date => {
-    const x = new Date(d);
-    x.setHours(0, 0, 0, 0);
-    const dow = x.getDay();
-    x.setDate(x.getDate() - dow);
-    return x;
-  },
-
-  span: (text: string | number, className: string): string => `<span class="${className}">${text}</span>`,
-
-  getSelectedPlatforms: (): Set<Platform> => {
-    const platforms = new Set<Platform>();
-    CONFIG.PLATFORMS.forEach((platform: Platform) => {
-      const checkbox = document.getElementById(`pf-${platform}`) as HTMLInputElement | null;
-      if (checkbox?.checked) {
-        platforms.add(platform);
-      }
-    });
-    return platforms;
-  },
-
-  debounce: <T extends any[]>(func: (...args: T) => void, delay: number) => {
-    let timeoutId: number | undefined;
-    
-    const debouncedFunction = (...args: T): void => {
-      clearTimeout(timeoutId);
-      timeoutId = window.setTimeout(() => func.apply(null, args), delay);
-    };
-    
-    debouncedFunction.cancel = (): void => {
-      clearTimeout(timeoutId);
-    };
-    
-    return debouncedFunction;
-  }
 };
 
 // Application object
@@ -163,13 +109,13 @@ const app = {
       });
 
       // Load saved data
-      app.loadData();
+      storageService.loadData(shows);
       
       // Initialize views
       app.reRender();
       app.bindEvents();
       
-      console.log('TV Show Guide initialized with TypeScript!');
+      logger.info('TV Show Guide initialized with TypeScript!');
     } catch (error) {
       errorHandler.handleError(
         error instanceof Error ? error : new Error(String(error)), 
@@ -182,7 +128,7 @@ const app = {
   reRender: (): void => {
     try {
       // For now, just show a basic message - full rendering will be added
-      console.log('Rendering views... TS version working!');
+      logger.info('Rendering views... TS version working!');
     } catch (error) {
       errorHandler.handleError(
         error instanceof Error ? error : new Error(String(error)), 
@@ -192,54 +138,13 @@ const app = {
     }
   },
 
-  loadData: (): void => {
-    const raw = localStorage.getItem(CONFIG.STORAGE_KEY);
-    if (!raw) return;
-
-    try {
-      const data = JSON.parse(raw);
-      Object.keys(data).forEach(k => {
-        const showId = parseInt(k);
-        if (shows[showId]) {
-          Object.assign(shows[showId], data[k]);
-        }
-      });
-      console.log('Data loaded successfully');
-    } catch (error) {
-      console.warn('Failed to load saved data:', error);
-    }
-  },
-
   saveData: (): void => {
-    try {
-      const out: Record<string, SeasonData> = {};
-      Object.keys(shows).forEach(k => {
-        const show = shows[parseInt(k)];
-        if (show) {
-          const { s, start, end, eps, air, ret } = show;
-          const seasonData: SeasonData = {};
-          
-          if (s !== null) seasonData.s = s;
-          if (start) seasonData.start = start;
-          if (end) seasonData.end = end;
-          if (eps !== null) seasonData.eps = eps;
-          if (air) seasonData.air = air;
-          if (ret !== undefined) seasonData.ret = ret;
-          
-          out[k] = seasonData;
-        }
-      });
-      
-      localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(out));
-      console.log('Data saved successfully');
-    } catch (error) {
-      console.warn('Failed to save data:', error);
-    }
+    storageService.saveData(shows);
   },
 
   bindEvents: (): void => {
     // Basic event binding - will be expanded
-    console.log('Events bound');
+    logger.info('Events bound');
   }
 };
 
@@ -251,4 +156,10 @@ if (document.readyState === 'loading') {
 }
 
 // Export for potential use by other modules
-export { app, shows, CONFIG, utils };
+export { 
+  app, 
+  shows, 
+  CONFIG, 
+  storageService, 
+  stateService 
+};

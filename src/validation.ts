@@ -700,7 +700,7 @@ export class ErrorHandler {
       cursor: pointer;
       color: #666;
     `;
-    closeBtn.onclick = () => notification.remove();
+    closeBtn.onclick = (): void => { notification.remove(); };
 
     // Set message
     const messageEl = document.createElement('div');
