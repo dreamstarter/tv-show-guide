@@ -8,6 +8,12 @@ const isDevelopmentMode = (): boolean => {
 };
 
 export const logger = {
+  debug: (message: string, ...args: unknown[]): void => {
+    if (isDevelopmentMode()) {
+      // eslint-disable-next-line no-console
+      console.log(`[DEBUG] ${message}`, ...args);
+    }
+  },
   info: (message: string, ...args: unknown[]): void => {
     if (isDevelopmentMode()) {
       // eslint-disable-next-line no-console
