@@ -1,32 +1,14 @@
 /**
- * TV Show Guide Application - TypeScript Version
- * Manages TV show data with season information, streaming platforms, and weekly scheduling
+ * TV Show Guide Application - Main Entry Point
+ * Modern modular architecture with TypeScript
  */
 
-import { 
-  SeasonData,
-  ShowDatabase,
-  AppConfiguration
-} from './types/index.js';
-
-import * as ShowValidation from './validation.js';
-import { StorageService } from './services/storageService.js';
-import { StateService } from './services/stateService.js';
+import { SeasonData, ShowDatabase } from './types/index.js';
+import { Application } from './core/Application.js';
+import { ShowManager } from './modules/showManager.js';
 import { logger } from './utils/logger.js';
 
-// Configuration and Constants
-const CONFIG: AppConfiguration = {
-  EPISODE_DEFAULTS: { ABC: 18, NBC: 22, CBS: 20, FOX: 13 },
-  DAY_ORDER: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const,
-  PLATFORMS: ['hulu', 'peacock', 'paramount'] as const,
-  STORAGE_KEY: 'showsSeasonData'
-};
-
-// Services
-const storageService = new StorageService(CONFIG.STORAGE_KEY);
-const stateService = new StateService();
-
-// Show database
+// Show database - this will eventually be moved to a data module
 const shows: ShowDatabase = {
   1: { t: '911', c: 'hulu', net: 'ABC', s: null, start: '', end: '', eps: null, air: 'Thursday', ret: true },
   2: { t: '911 Lonestar', c: 'hulu', net: 'FOX', s: null, start: '', end: '', eps: null, air: 'Tuesday', ret: true },
@@ -62,12 +44,6 @@ const shows: ShowDatabase = {
   32: { t: 'Will Trent', c: 'hulu', net: 'ABC', s: null, start: '', end: '', eps: null, air: 'Tuesday', ret: true }
 };
 
-// State management (using StateService)
-// appState is now managed by stateService
-
-// Initialize error handler
-const errorHandler = new ShowValidation.ErrorHandler();
-
 // Preloaded season data - applied during initialization
 const preloadSeasonData: Record<string, SeasonData> = {
   "15": { "s": 2, "start": "2025-09-16", "air": "Tuesday", "ret": true },
@@ -94,72 +70,73 @@ const preloadSeasonData: Record<string, SeasonData> = {
   "12": { "ret": false }, "28": { "ret": false }, "22": { "ret": false },
   "25": { "ret": false }, "24": { "ret": false }, "11": { "ret": false },
   "16": { "ret": false }, "23": { "ret": false }, "26": { "ret": false },
+  "29": { "ret": false }
 };
 
-// Application object
-const app = {
-  init: (): void => {
+// Application instances
+const app = new Application(shows);
+const showManager = new ShowManager(shows);
+
+/**
+ * Apply preloaded season data to shows
+ */
+function applyPreloadedData(): void {
+  Object.keys(preloadSeasonData).forEach(k => {
+    const showId = parseInt(k);
+    if (shows[showId]) {
+      Object.assign(shows[showId], preloadSeasonData[k]);
+    }
+  });
+  logger.info('Preloaded season data applied');
+}
+
+/**
+ * Legacy app object for backward compatibility
+ * This will be phased out as we move to the new Application class
+ */
+const legacyApp = {
+  init: async (): Promise<void> => {
     try {
       // Apply preloaded data
-      Object.keys(preloadSeasonData).forEach(k => {
-        const showId = parseInt(k);
-        if (shows[showId]) {
-          Object.assign(shows[showId], preloadSeasonData[k]);
-        }
-      });
-
-      // Load saved data
-      storageService.loadData(shows);
+      applyPreloadedData();
       
-      // Initialize views
-      app.reRender();
-      app.bindEvents();
+      // Initialize the new modular application
+      await app.init();
       
-      logger.info('TV Show Guide initialized with TypeScript!');
+      logger.info('Application started using new modular architecture');
     } catch (error) {
-      errorHandler.handleError(
-        error instanceof Error ? error : new Error(String(error)), 
-        true, 
-        'Application initialization'
-      );
+      logger.error('Failed to initialize application:', error);
     }
   },
 
-  reRender: (): void => {
-    try {
-      // For now, just show a basic message - full rendering will be added
-      logger.info('Rendering views... TS version working!');
-    } catch (error) {
-      errorHandler.handleError(
-        error instanceof Error ? error : new Error(String(error)), 
-        true, 
-        'Re-rendering views'
-      );
-    }
+  save: (): void => {
+    app.save();
   },
 
-  saveData: (): void => {
-    storageService.saveData(shows);
+  getStats: (): ReturnType<typeof showManager.getStats> => {
+    return showManager.getStats();
   },
 
-  bindEvents: (): void => {
-    // Basic event binding - will be expanded
-    logger.info('Events bound');
+  searchShows: (term: string): ReturnType<typeof showManager.searchShows> => {
+    return showManager.searchShows(term);
+  },
+
+  getShowsByPlatform: (platform: 'hulu' | 'peacock' | 'paramount'): ReturnType<typeof showManager.getShowsByPlatform> => {
+    return showManager.getShowsByPlatform(platform);
   }
 };
 
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', app.init);
+  document.addEventListener('DOMContentLoaded', () => legacyApp.init());
 } else {
-  app.init();
+  legacyApp.init();
 }
 
 // Export for potential use by other modules
 export { 
   app, 
+  showManager, 
   shows, 
-  CONFIG, 
-  storageService, 
-  stateService 
+  legacyApp as appLegacy 
 };
