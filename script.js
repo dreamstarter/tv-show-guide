@@ -91,6 +91,8 @@ const shows = {
 
 // State management
 let weekOffset = 0; // weeks relative to current week
+let currentSearchTerm = ''; // current search query
+let searchResults = null; // cached search results
 
 // Utility Functions
 const utils = {
@@ -126,6 +128,163 @@ const utils = {
       }
     });
     return platforms;
+  },
+
+  /**
+   * Debounce function to limit how often a function can be called
+   * @param {Function} func - Function to debounce
+   * @param {number} delay - Delay in milliseconds
+   * @returns {Function} - Debounced function with cancel method
+   */
+  debounce: (func, delay) => {
+    let timeoutId;
+    
+    const debouncedFunction = (...args) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => func.apply(null, args), delay);
+    };
+    
+    // Add cancel method to clear pending execution
+    debouncedFunction.cancel = () => {
+      clearTimeout(timeoutId);
+    };
+    
+    return debouncedFunction;
+  }
+};
+
+// Search functionality
+const search = {
+  /**
+   * Performs fuzzy search on show data
+   * @param {string} query - Search query
+   * @returns {Array} - Array of matching show IDs with relevance scores
+   */
+  performSearch: (query) => {
+    if (!query || query.trim() === '') {
+      return Object.keys(shows).map(id => ({ id: parseInt(id), score: 1 }));
+    }
+
+    const normalizedQuery = query.toLowerCase().trim();
+    const words = normalizedQuery.split(/\s+/);
+    const results = [];
+
+    Object.entries(shows).forEach(([id, show]) => {
+      if (!show || !show.t) return;
+
+      let totalScore = 0;
+      const searchableText = [
+        show.t,           // title
+        show.net,         // network  
+        show.c,           // platform
+        show.air || ''    // air day
+      ].join(' ').toLowerCase();
+
+      // Calculate relevance score
+      words.forEach(word => {
+        // Exact title match gets highest score
+        if (show.t.toLowerCase() === word) {
+          totalScore += 100;
+        }
+        // Title starts with word
+        else if (show.t.toLowerCase().startsWith(word)) {
+          totalScore += 50;
+        }
+        // Title contains word
+        else if (show.t.toLowerCase().includes(word)) {
+          totalScore += 25;
+        }
+        // Network exact match
+        else if (show.net && show.net.toLowerCase() === word) {
+          totalScore += 20;
+        }
+        // Platform exact match
+        else if (show.c && show.c.toLowerCase() === word) {
+          totalScore += 15;
+        }
+        // Network partial match
+        else if (show.net && show.net.toLowerCase().includes(word)) {
+          totalScore += 10;
+        }
+        // Platform partial match
+        else if (show.c && show.c.toLowerCase().includes(word)) {
+          totalScore += 8;
+        }
+        // Air day match
+        else if (show.air && show.air.toLowerCase().includes(word)) {
+          totalScore += 5;
+        }
+        // General text match
+        else if (searchableText.includes(word)) {
+          totalScore += 3;
+        }
+      });
+
+      // Boost score for shows with multiple word matches
+      const wordMatches = words.filter(word => searchableText.includes(word)).length;
+      if (wordMatches > 1) {
+        totalScore += wordMatches * 5;
+      }
+
+      if (totalScore > 0) {
+        results.push({ id: parseInt(id), score: totalScore });
+      }
+    });
+
+    // Sort by relevance score (descending)
+    return results.sort((a, b) => b.score - a.score);
+  },
+
+  /**
+   * Debounced search function
+   */
+  debouncedSearch: null, // Will be set up in initialization
+
+  /**
+   * Clears the current search
+   */
+  clearSearch: () => {
+    currentSearchTerm = '';
+    searchResults = null;
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+      searchInput.value = '';
+    }
+    app.reRender();
+    errorHandler.showNotification('Search cleared', 'info');
+  },
+
+  /**
+   * Gets filtered show IDs based on current search and platform filters
+   * @returns {Array} - Array of show IDs that match current filters
+   */
+  getFilteredShowIds: () => {
+    let showIds;
+
+    // Start with search results if there's an active search
+    if (currentSearchTerm && searchResults) {
+      showIds = searchResults.map(result => result.id);
+    } else {
+      // Otherwise use all shows
+      showIds = Object.keys(shows).map(k => parseInt(k));
+    }
+
+    // Apply platform filters
+    const selectedPlatforms = utils.getSelectedPlatforms();
+    const includeNonRet = document.getElementById('show-nonret')?.checked ?? false;
+
+    return showIds.filter(id => {
+      const show = shows[id];
+      if (!show) return false;
+      
+      // Platform filter
+      if (!selectedPlatforms.has(show.c)) return false;
+      
+      // Returning status filter
+      if (!includeNonRet && show.ret === false) return false;
+      
+      return true;
+    });
   }
 };
 
@@ -359,12 +518,24 @@ const rendering = {
         throw new Error('Legend table element not found');
       }
       
-      const includeNonRet = document.getElementById('show-nonret')?.checked ?? false;
-      const nums = Object.keys(shows)
-        .map(k => parseInt(k))
-        .filter(n => !isNaN(n))
-        .sort((a, b) => a - b)
-        .filter(n => includeNonRet || shows[n].ret !== false);
+      const filteredIds = search.getFilteredShowIds();
+      const nums = filteredIds.sort((a, b) => a - b);
+
+      // Add search results indicator
+      if (currentSearchTerm) {
+        const indicator = document.getElementById('searchResultsIndicator') || 
+          document.createElement('div');
+        indicator.id = 'searchResultsIndicator';
+        indicator.className = 'search-results-indicator';
+        indicator.innerHTML = `<span class="muted">Search results for "${currentSearchTerm}": ${nums.length} shows found</span>`;
+        
+        if (!document.getElementById('searchResultsIndicator')) {
+          table.parentNode.insertBefore(indicator, table);
+        }
+      } else {
+        const indicator = document.getElementById('searchResultsIndicator');
+        if (indicator) indicator.remove();
+      }
 
       let rows = '';
       for (let i = 0; i < nums.length; i += 4) {
@@ -376,14 +547,32 @@ const rendering = {
           const dateInfo = s.start ? `S${s.s || '?'}: ${s.start}${endDate ? ' – ' + endDate : ''}` : 'Season dates: TBD';
           const statusClass = s.ret ? '' : 'ended';
           
+          // Highlight search terms in title
+          let displayTitle = s.t;
+          if (currentSearchTerm) {
+            const regex = new RegExp(`(${currentSearchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+            displayTitle = s.t.replace(regex, '<mark>$1</mark>');
+          }
+          
           return `<td>
             ${utils.span(n, s.c)} 
-            <span class="${statusClass}">${s.t}</span>
+            <span class="${statusClass}">${displayTitle}</span>
             <span class="meta">${dateInfo}</span>
           </td>`;
         }).join('');
+        
+        // Pad with empty cells if needed
+        while (cells.split('</td>').length - 1 < 4) {
+          cells += '<td></td>';
+        }
+        
         rows += `<tr>${cells}</tr>`;
       }
+      
+      if (nums.length === 0) {
+        rows = '<tr><td colspan="4" style="text-align: center; font-style: italic;">No shows match the current search and filters.</td></tr>';
+      }
+      
       table.innerHTML = rows;
     } catch (error) {
       errorHandler.handleError(error, true, 'Rendering legend view');
@@ -402,17 +591,10 @@ const rendering = {
         throw new Error('All shows container element not found');
       }
       
-      const selected = utils.getSelectedPlatforms();
-      const includeNonRet = document.getElementById('show-nonret')?.checked ?? false;
+      const filteredIds = search.getFilteredShowIds();
       
-      const items = Object.keys(shows)
-        .map(k => parseInt(k))
-        .filter(n => !isNaN(n))
+      const items = filteredIds
         .sort((a, b) => a - b)
-        .filter(n => {
-          const show = shows[n];
-          return show && selected.has(show.c) && (includeNonRet || show.ret !== false);
-        })
         .map(n => {
           const s = shows[n];
           if (!s) return 'Invalid show';
@@ -421,10 +603,26 @@ const rendering = {
           const dateInfo = s.start ? ` <span class="meta">(S${s.s || '?'}: ${s.start}${endDate ? ' – ' + endDate : ''})</span>` : '';
           const statusClass = s.ret ? '' : 'ended';
           
-          return `${utils.span(n, s.c)} <span class="${statusClass}">${s.t}</span>${dateInfo}`;
+          // Highlight search terms in title
+          let displayTitle = s.t;
+          if (currentSearchTerm) {
+            const regex = new RegExp(`(${currentSearchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+            displayTitle = s.t.replace(regex, '<mark>$1</mark>');
+          }
+          
+          return `${utils.span(n, s.c)} <span class="${statusClass}">${displayTitle}</span>${dateInfo}`;
         });
 
-      container.innerHTML = items.length > 0 ? items.join('<br>') : '<em>No shows match the current filters</em>';
+      if (items.length === 0) {
+        container.innerHTML = '<em>No shows match the current search and filters</em>';
+      } else {
+        container.innerHTML = items.join('<br>');
+        
+        // Add search indicator if searching
+        if (currentSearchTerm) {
+          container.innerHTML = `<div class="search-results-indicator"><span class="muted">Search results for "${currentSearchTerm}": ${items.length} shows found</span></div><br>` + container.innerHTML;
+        }
+      }
     } catch (error) {
       errorHandler.handleError(error, true, 'Rendering all shows view');
       // Provide fallback content
@@ -442,8 +640,7 @@ const rendering = {
         throw new Error('Week table element not found');
       }
       
-      const selected = utils.getSelectedPlatforms();
-      const includeNonRet = document.getElementById('show-nonret')?.checked ?? false;
+      const filteredIds = search.getFilteredShowIds();
       const startOfWeek = dataProcessing.currentWeekStart();
       const endOfWeek = new Date(startOfWeek);
       endOfWeek.setDate(endOfWeek.getDate() + 6);
@@ -452,6 +649,9 @@ const rendering = {
       if (weekRangeElement) {
         weekRangeElement.textContent = `${utils.formatDate(startOfWeek)} – ${utils.formatDate(endOfWeek)}`;
       }
+      
+      // Create a set of filtered IDs for faster lookup
+      const filteredIdSet = new Set(filteredIds);
       
       const dayMap = dataProcessing.byDay();
       let html = '<table><thead><tr>' + CONFIG.DAY_ORDER.map(d => `<th>${d}</th>`).join('') + '</tr></thead><tbody><tr>';
@@ -462,10 +662,7 @@ const rendering = {
         const dayName = CONFIG.DAY_ORDER[i];
         
         const items = (dayMap[dayName] || [])
-          .filter(n => {
-            const show = shows[n];
-            return show && selected.has(show.c) && (includeNonRet || show.ret !== false);
-          })
+          .filter(n => filteredIdSet.has(n)) // Use filtered IDs
           .map(n => {
             const show = shows[n];
             if (!show) return 'Invalid show';
@@ -474,12 +671,25 @@ const rendering = {
             const statusClass = show.ret ? '' : 'ended';
             const episodeInfo = episode ? ` <span class="muted">(${episode})</span>` : '';
             
-            return `${utils.span(n, show.c)} <span class="${statusClass}">${show.t}</span>${episodeInfo}`;
+            // Highlight search terms in title
+            let displayTitle = show.t;
+            if (currentSearchTerm) {
+              const regex = new RegExp(`(${currentSearchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+              displayTitle = show.t.replace(regex, '<mark>$1</mark>');
+            }
+            
+            return `${utils.span(n, show.c)} <span class="${statusClass}">${displayTitle}</span>${episodeInfo}`;
           });
           
         html += `<td class="shows">${items.length > 0 ? items.join('<br>') : '<em>No shows</em>'}</td>`;
       }
       html += '</tr></tbody></table>';
+      
+      // Add search indicator if searching
+      if (currentSearchTerm) {
+        html = `<div class="search-results-indicator"><span class="muted">Search results for "${currentSearchTerm}": ${filteredIds.length} shows total</span></div><br>` + html;
+      }
+      
       wrap.innerHTML = html;
     } catch (error) {
       errorHandler.handleError(error, true, 'Rendering week view');
@@ -926,17 +1136,73 @@ const app = {
   },
 
   bindEvents: () => {
+    // Initialize debounced search
+    search.debouncedSearch = utils.debounce((query) => {
+      try {
+        currentSearchTerm = query.trim();
+        
+        if (currentSearchTerm) {
+          searchResults = search.performSearch(currentSearchTerm);
+          errorHandler.showNotification(`Found ${searchResults.length} matching shows`, 'info');
+        } else {
+          searchResults = null;
+        }
+        
+        app.reRender();
+      } catch (error) {
+        errorHandler.handleError(error, true, 'Performing search');
+      }
+    }, 300);
+
     // View toggle buttons
     document.getElementById('btnAll').addEventListener('click', () => eventHandlers.setMode('all'));
     document.getElementById('btnWeek').addEventListener('click', () => eventHandlers.setMode('week'));
 
+    // Search functionality
+    const searchInput = document.getElementById('searchInput');
+    const clearSearchBtn = document.getElementById('clearSearch');
+    
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        const query = e.target.value;
+        search.debouncedSearch(query);
+        
+        // Show/hide clear button
+        if (clearSearchBtn) {
+          clearSearchBtn.style.display = query ? 'flex' : 'none';
+        }
+      });
+      
+      // Handle keyboard shortcuts
+      searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          search.clearSearch();
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          // Trigger immediate search (bypass debounce)
+          search.debouncedSearch.cancel && search.debouncedSearch.cancel();
+          search.debouncedSearch(e.target.value);
+        }
+      });
+    }
+    
+    if (clearSearchBtn) {
+      clearSearchBtn.addEventListener('click', search.clearSearch);
+      clearSearchBtn.style.display = 'none'; // Initially hidden
+    }
+
     // Platform filters
     CONFIG.PLATFORMS.forEach(platform => {
-      document.getElementById(`pf-${platform}`).addEventListener('change', app.reRender);
+      document.getElementById(`pf-${platform}`).addEventListener('change', () => {
+        // Re-apply filters without re-searching
+        app.reRender();
+      });
     });
 
     // Other filters
-    document.getElementById('show-nonret').addEventListener('change', app.reRender);
+    document.getElementById('show-nonret').addEventListener('change', () => {
+      app.reRender();
+    });
     
     ['use-estimates', 'est-abc', 'est-nbc', 'est-cbs', 'est-fox'].forEach(id => {
       document.getElementById(id).addEventListener('change', app.reRender);

@@ -31,33 +31,51 @@
       </p>
 
       <section class="filters" aria-label="Filter options">
-        <strong>Platform Filters:</strong>
-        <label>
-          <input type="checkbox" id="pf-hulu" checked> 
-          <span class="hulu chip">Hulu</span>
-        </label>
-        <label>
-          <input type="checkbox" id="pf-peacock" checked> 
-          <span class="peacock chip">Peacock</span>
-        </label>
-        <label>
-          <input type="checkbox" id="pf-paramount" checked> 
-          <span class="paramount chip">Paramount+</span>
-        </label>
-        <span style="margin-left: 8px; color: #555">(uncheck to hide a platform)</span>
-        <span style="flex: 1 1 auto"></span>
-        <label>
-          <input type="checkbox" id="show-nonret"> 
-          <span class="chip" style="background: var(--border); color: var(--text)">Show non-returning</span>
-        </label>
-        <span style="flex-basis: 100%"></span>
-        <label class="pill">
-          Use default eps <input type="checkbox" id="use-estimates" checked>
-        </label>
-        <label><input type="checkbox" id="est-abc" checked> ABC</label>
-        <label><input type="checkbox" id="est-nbc" checked> NBC</label>
-        <label><input type="checkbox" id="est-cbs" checked> CBS</label>
-        <label><input type="checkbox" id="est-fox" checked> FOX</label>
+        <div class="search-container">
+          <label for="searchInput">
+            <strong>Search Shows:</strong>
+          </label>
+          <input 
+            type="search" 
+            id="searchInput" 
+            placeholder="Search by title, network, or platform..." 
+            aria-label="Search shows"
+            autocomplete="off"
+          >
+          <button type="button" id="clearSearch" class="btn btn--small" aria-label="Clear search">×</button>
+        </div>
+        
+        <div class="filter-row">
+          <strong>Platform Filters:</strong>
+          <label>
+            <input type="checkbox" id="pf-hulu" checked> 
+            <span class="hulu chip">Hulu</span>
+          </label>
+          <label>
+            <input type="checkbox" id="pf-peacock" checked> 
+            <span class="peacock chip">Peacock</span>
+          </label>
+          <label>
+            <input type="checkbox" id="pf-paramount" checked> 
+            <span class="paramount chip">Paramount+</span>
+          </label>
+          <span style="margin-left: 8px; color: #555">(uncheck to hide a platform)</span>
+          <span style="flex: 1 1 auto"></span>
+          <label>
+            <input type="checkbox" id="show-nonret"> 
+            <span class="chip" style="background: var(--border); color: var(--text)">Show non-returning</span>
+          </label>
+        </div>
+        
+        <div class="filter-row">
+          <label class="pill">
+            Use default eps <input type="checkbox" id="use-estimates" checked>
+          </label>
+          <label><input type="checkbox" id="est-abc" checked> ABC</label>
+          <label><input type="checkbox" id="est-nbc" checked> NBC</label>
+          <label><input type="checkbox" id="est-cbs" checked> CBS</label>
+          <label><input type="checkbox" id="est-fox" checked> FOX</label>
+        </div>
       </section>
 
       <section>
