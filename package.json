@@ -1,0 +1,47 @@
+{
+  "name": "tv-show-guide",
+  "version": "1.0.0",
+  "description": "TV Show Guide for tracking and managing television shows across streaming platforms",
+  "main": "dist/script.js",
+  "scripts": {
+    "dev": "tsc --watch",
+    "build": "tsc",
+    "build:clean": "rimraf dist && tsc",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src/**/*.ts",
+    "format": "prettier --write src/**/*.ts",
+    "serve": "http-server . -p 3000 -o",
+    "start": "npm run serve"
+  },
+  "keywords": [
+    "tv-shows",
+    "streaming",
+    "schedule",
+    "typescript",
+    "web-app"
+  ],
+  "author": "dreamstarter",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.14.0",
+    "@typescript-eslint/parser": "^6.14.0",
+    "eslint": "^8.55.0",
+    "http-server": "^14.1.1",
+    "prettier": "^3.1.1",
+    "rimraf": "^5.0.5",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dreamstarter/tv-show-guide.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dreamstarter/tv-show-guide/issues"
+  },
+  "homepage": "https://github.com/dreamstarter/tv-show-guide#readme"
+}
