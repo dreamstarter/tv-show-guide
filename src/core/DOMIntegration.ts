@@ -149,8 +149,8 @@ export class DOMIntegration {
     this.unsubscribers.push(unsubFilters);
 
     // Subscribe to week offset changes - updates week view and range display
-    const unsubWeekOffset = this.reactiveShowManager.subscribeToWeekOffset(() => {
-      logger.debug('Week offset changed - updating week view');
+    const unsubWeekOffset = this.reactiveShowManager.subscribeToWeekOffset((offset) => {
+      logger.info(`Week offset changed to ${offset} - updating week view`);
       if (this.viewMode.current === 'week') {
         this.renderWeekView();
       }
@@ -511,11 +511,14 @@ export class DOMIntegration {
    */
   private handlePreviousWeek(): void {
     if (!this.reactiveShowManager) {
+      logger.warn('ReactiveShowManager not available');
       return;
     }
 
+    const oldOffset = this.reactiveShowManager.getWeekOffset();
     this.reactiveShowManager.previousWeek();
-    logger.info('Navigated to previous week');
+    const newOffset = this.reactiveShowManager.getWeekOffset();
+    logger.info(`Navigated to previous week: ${oldOffset} -> ${newOffset}`);
   }
 
   /**
@@ -523,11 +526,14 @@ export class DOMIntegration {
    */
   private handleNextWeek(): void {
     if (!this.reactiveShowManager) {
+      logger.warn('ReactiveShowManager not available');
       return;
     }
 
+    const oldOffset = this.reactiveShowManager.getWeekOffset();
     this.reactiveShowManager.nextWeek();
-    logger.info('Navigated to next week');
+    const newOffset = this.reactiveShowManager.getWeekOffset();
+    logger.info(`Navigated to next week: ${oldOffset} -> ${newOffset}`);
   }
 
   /**
@@ -535,11 +541,14 @@ export class DOMIntegration {
    */
   private handleCurrentWeek(): void {
     if (!this.reactiveShowManager) {
+      logger.warn('ReactiveShowManager not available');
       return;
     }
 
+    const oldOffset = this.reactiveShowManager.getWeekOffset();
     this.reactiveShowManager.currentWeek();
-    logger.info('Navigated to current week');
+    const newOffset = this.reactiveShowManager.getWeekOffset();
+    logger.info(`Navigated to current week: ${oldOffset} -> ${newOffset}`);
   }
 
   /**
@@ -697,6 +706,7 @@ export class DOMIntegration {
       // Get current week range
       const weekOffset = this.reactiveShowManager?.getWeekOffset() || 0;
       const { startDate, endDate } = this.getWeekRange(weekOffset);
+      logger.info(`Rendering week view with offset ${weekOffset}: ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`);
 
       // Get all shows and organize by air day
       const allShows = this.showManager.getAllShows();
@@ -712,31 +722,9 @@ export class DOMIntegration {
         showEntries = showEntries.filter(({ id }) => searchIds.has(id));
       }
 
-      // Filter shows by date range - check if show is airing during the selected week
-      showEntries = showEntries.filter(({ show }) => {
-        if (!show.start) {
-          // If no start date, include show (legacy data)
-          return true;
-        }
-
-        try {
-          const seasonStart = new Date(show.start);
-          
-          // If no end date, assume show is currently airing
-          if (!show.end) {
-            // Show is airing if season started before or during the selected week
-            return seasonStart <= endDate;
-          }
-
-          const seasonEnd = new Date(show.end);
-          
-          // Check if show's season overlaps with the selected week
-          // (season starts before week ends AND season ends after week starts)
-          return seasonStart <= endDate && seasonEnd >= startDate;
-        } catch {
-          return true; // Include shows with invalid dates
-        }
-      });
+      // Note: Week navigation currently updates the date range display
+      // Future enhancement: Filter shows by actual episode air dates when that data is available
+      // For now, shows are grouped by day of week (recurring schedule) rather than specific dates
 
       // Group shows by air day
       const showsByDay: Record<string, Array<{ id: number; show: Show }>> = {
@@ -835,8 +823,11 @@ export class DOMIntegration {
       const showsWithAirDays = showEntries.filter(({ show }) => show.air).length;
       const showsWithoutAirDays = totalFilteredShows - showsWithAirDays;
 
+      const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' };
+      const weekRangeText = `${startDate.toLocaleDateString('en-US', options)} - ${endDate.toLocaleDateString('en-US', options)}`;
+
       tableHtml += `<div class="week-summary">
-        <p><strong>Weekly Schedule Summary:</strong></p>
+        <p><strong>Weekly Schedule for ${weekRangeText}:</strong></p>
         <ul>
           <li>${totalFilteredShows} shows total (after filters)</li>
           <li>${showsWithAirDays} shows with air day information</li>
