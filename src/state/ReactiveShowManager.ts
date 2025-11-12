@@ -64,6 +64,7 @@ export class ReactiveShowManager {
     }, 'initialize filters');
     this.stateManager.set('ui.currentView', 'all-shows', 'initialize view');
     this.stateManager.set('ui.searchTerm', '', 'initialize search');
+    this.stateManager.set('ui.weekOffset', 0, 'initialize week offset');
   }
 
   /**
@@ -318,6 +319,56 @@ export class ReactiveShowManager {
       airDays: [],
       searchTerm: '',
     }, action);
+  }
+
+  /**
+   * Set week offset (0 = current week, -1 = previous week, 1 = next week)
+   */
+  setWeekOffset(offset: number, action?: string): void {
+    const actionDescription = action || `set week offset: ${offset}`;
+    this.stateManager.set('ui.weekOffset', offset, actionDescription);
+  }
+
+  /**
+   * Get current week offset
+   */
+  getWeekOffset(): number {
+    return this.stateManager.get<number>('ui.weekOffset') || 0;
+  }
+
+  /**
+   * Navigate to previous week
+   */
+  previousWeek(action?: string): void {
+    const currentOffset = this.getWeekOffset();
+    const actionDescription = action || 'navigate to previous week';
+    this.setWeekOffset(currentOffset - 1, actionDescription);
+  }
+
+  /**
+   * Navigate to next week
+   */
+  nextWeek(action?: string): void {
+    const currentOffset = this.getWeekOffset();
+    const actionDescription = action || 'navigate to next week';
+    this.setWeekOffset(currentOffset + 1, actionDescription);
+  }
+
+  /**
+   * Reset to current week
+   */
+  currentWeek(action?: string): void {
+    const actionDescription = action || 'navigate to current week';
+    this.setWeekOffset(0, actionDescription);
+  }
+
+  /**
+   * Subscribe to week offset changes
+   */
+  subscribeToWeekOffset(observer: (offset: number) => void): () => void {
+    return this.stateManager.subscribe('ui.weekOffset', (newValue) => {
+      observer(newValue as number);
+    });
   }
 
   /**

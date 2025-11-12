@@ -29,6 +29,11 @@ export interface DOMElements {
   undoBtn: HTMLButtonElement | null;
   redoBtn: HTMLButtonElement | null;
   historyStatus: HTMLElement | null;
+  prevWeek: HTMLButtonElement | null;
+  thisWeek: HTMLButtonElement | null;
+  nextWeek: HTMLButtonElement | null;
+  weekRange: HTMLElement | null;
+  jumpDate: HTMLInputElement | null;
 }
 
 export interface ViewMode {
@@ -73,6 +78,7 @@ export class DOMIntegration {
       if (this.reactiveShowManager) {
         this.setupReactiveSubscriptions();
         this.updateHistoryButtons(); // Initialize history button states
+        this.updateWeekRangeDisplay(); // Initialize week range display
         logger.info('Reactive subscriptions enabled');
       } else {
         logger.warn('ReactiveShowManager not available - using legacy mode');
@@ -142,6 +148,17 @@ export class DOMIntegration {
     });
     this.unsubscribers.push(unsubFilters);
 
+    // Subscribe to week offset changes - updates week view and range display
+    const unsubWeekOffset = this.reactiveShowManager.subscribeToWeekOffset(() => {
+      logger.debug('Week offset changed - updating week view');
+      if (this.viewMode.current === 'week') {
+        this.renderWeekView();
+      }
+      this.updateWeekRangeDisplay();
+      this.updateHistoryButtons(); // Update history buttons after state changes
+    });
+    this.unsubscribers.push(unsubWeekOffset);
+
     logger.info('Reactive subscriptions setup complete');
   }
 
@@ -168,7 +185,12 @@ export class DOMIntegration {
       pasteJson: document.getElementById('pasteJson') as HTMLTextAreaElement,
       undoBtn: document.getElementById('undoBtn') as HTMLButtonElement,
       redoBtn: document.getElementById('redoBtn') as HTMLButtonElement,
-      historyStatus: document.getElementById('historyStatus')
+      historyStatus: document.getElementById('historyStatus'),
+      prevWeek: document.getElementById('prevWeek') as HTMLButtonElement,
+      thisWeek: document.getElementById('thisWeek') as HTMLButtonElement,
+      nextWeek: document.getElementById('nextWeek') as HTMLButtonElement,
+      weekRange: document.getElementById('weekRange'),
+      jumpDate: document.getElementById('jumpDate') as HTMLInputElement
     };
   }
 
@@ -259,6 +281,23 @@ export class DOMIntegration {
         e.preventDefault();
         this.handleRedo();
       }
+    });
+
+    // Week navigation controls
+    this.elements.prevWeek?.addEventListener('click', () => {
+      this.handlePreviousWeek();
+    });
+
+    this.elements.thisWeek?.addEventListener('click', () => {
+      this.handleCurrentWeek();
+    });
+
+    this.elements.nextWeek?.addEventListener('click', () => {
+      this.handleNextWeek();
+    });
+
+    this.elements.jumpDate?.addEventListener('change', (e) => {
+      this.handleJumpToDate((e.target as HTMLInputElement).value);
     });
 
     logger.info('DOM event listeners set up successfully');
@@ -468,6 +507,108 @@ export class DOMIntegration {
   }
 
   /**
+   * Handle previous week navigation
+   */
+  private handlePreviousWeek(): void {
+    if (!this.reactiveShowManager) {
+      return;
+    }
+
+    this.reactiveShowManager.previousWeek();
+    logger.info('Navigated to previous week');
+  }
+
+  /**
+   * Handle next week navigation
+   */
+  private handleNextWeek(): void {
+    if (!this.reactiveShowManager) {
+      return;
+    }
+
+    this.reactiveShowManager.nextWeek();
+    logger.info('Navigated to next week');
+  }
+
+  /**
+   * Handle current week navigation
+   */
+  private handleCurrentWeek(): void {
+    if (!this.reactiveShowManager) {
+      return;
+    }
+
+    this.reactiveShowManager.currentWeek();
+    logger.info('Navigated to current week');
+  }
+
+  /**
+   * Handle jump to date
+   */
+  private handleJumpToDate(dateString: string): void {
+    if (!this.reactiveShowManager || !dateString) {
+      return;
+    }
+
+    try {
+      const selectedDate = new Date(dateString);
+      const currentDate = new Date();
+      
+      // Calculate week offset
+      const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+      const timeDiff = selectedDate.getTime() - currentDate.getTime();
+      const weekOffset = Math.round(timeDiff / msPerWeek);
+      
+      this.reactiveShowManager.setWeekOffset(weekOffset, `jump to ${dateString}`);
+      logger.info(`Jumped to date: ${dateString} (offset: ${weekOffset})`);
+    } catch (error) {
+      logger.error('Invalid date selected', error);
+    }
+  }
+
+  /**
+   * Update week range display
+   */
+  private updateWeekRangeDisplay(): void {
+    if (!this.reactiveShowManager || !this.elements.weekRange) {
+      return;
+    }
+
+    const weekOffset = this.reactiveShowManager.getWeekOffset();
+    const { startDate, endDate } = this.getWeekRange(weekOffset);
+    
+    const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' };
+    const startStr = startDate.toLocaleDateString('en-US', options);
+    const endStr = endDate.toLocaleDateString('en-US', options);
+    
+    this.elements.weekRange.textContent = `${startStr} - ${endStr}`;
+  }
+
+  /**
+   * Calculate week range based on offset
+   */
+  private getWeekRange(offset: number): { startDate: Date; endDate: Date } {
+    const today = new Date();
+    const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    
+    // Calculate start of current week (Sunday)
+    const startOfCurrentWeek = new Date(today);
+    startOfCurrentWeek.setDate(today.getDate() - currentDay);
+    startOfCurrentWeek.setHours(0, 0, 0, 0);
+    
+    // Apply offset
+    const startDate = new Date(startOfCurrentWeek);
+    startDate.setDate(startOfCurrentWeek.getDate() + (offset * 7));
+    
+    // Calculate end of week (Saturday)
+    const endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + 6);
+    endDate.setHours(23, 59, 59, 999);
+    
+    return { startDate, endDate };
+  }
+
+  /**
    * Render the current view based on mode
    */
   private renderCurrentView(): void {
@@ -553,6 +694,10 @@ export class DOMIntegration {
     }
 
     try {
+      // Get current week range
+      const weekOffset = this.reactiveShowManager?.getWeekOffset() || 0;
+      const { startDate, endDate } = this.getWeekRange(weekOffset);
+
       // Get all shows and organize by air day
       const allShows = this.showManager.getAllShows();
       let showEntries = Object.entries(allShows).map(([id, show]) => ({ id: parseInt(id), show }));
@@ -566,6 +711,32 @@ export class DOMIntegration {
         const searchIds = new Set(Object.keys(searchResults).map(id => parseInt(id)));
         showEntries = showEntries.filter(({ id }) => searchIds.has(id));
       }
+
+      // Filter shows by date range - check if show is airing during the selected week
+      showEntries = showEntries.filter(({ show }) => {
+        if (!show.start) {
+          // If no start date, include show (legacy data)
+          return true;
+        }
+
+        try {
+          const seasonStart = new Date(show.start);
+          
+          // If no end date, assume show is currently airing
+          if (!show.end) {
+            // Show is airing if season started before or during the selected week
+            return seasonStart <= endDate;
+          }
+
+          const seasonEnd = new Date(show.end);
+          
+          // Check if show's season overlaps with the selected week
+          // (season starts before week ends AND season ends after week starts)
+          return seasonStart <= endDate && seasonEnd >= startDate;
+        } catch {
+          return true; // Include shows with invalid dates
+        }
+      });
 
       // Group shows by air day
       const showsByDay: Record<string, Array<{ id: number; show: Show }>> = {
