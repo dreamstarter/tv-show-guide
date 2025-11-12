@@ -304,3 +304,82 @@ textarea {
     display: none;
   }
 }
+
+/* Notification system */
+.notifications-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 10000;
+  max-width: 400px;
+}
+
+.notification {
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  position: relative;
+  word-wrap: break-word;
+  animation: slideIn 0.3s ease-out;
+}
+
+.notification--error {
+  background: #fee;
+  border: 1px solid #f99;
+  color: #c33;
+}
+
+.notification--success {
+  background: #efe;
+  border: 1px solid #9f9;
+  color: #363;
+}
+
+.notification--warning {
+  background: #ffc;
+  border: 1px solid #fc9;
+  color: #963;
+}
+
+.notification--info {
+  background: #eef;
+  border: 1px solid #99f;
+  color: #336;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Form validation styles */
+input:invalid {
+  border-color: #f99;
+  box-shadow: 0 0 0 1px rgba(255, 153, 153, 0.3);
+}
+
+input:valid {
+  border-color: #9f9;
+  box-shadow: 0 0 0 1px rgba(153, 255, 153, 0.3);
+}
+
+/* Error state styling */
+.error-state {
+  background: #fee;
+  border: 1px solid #f99;
+  padding: 12px;
+  border-radius: 4px;
+  margin: 8px 0;
+}
+
+.error-state h3 {
+  margin-top: 0;
+  color: #c33;
+}
