@@ -511,12 +511,25 @@ const persistence = {
 
 // Rendering functions
 const rendering = {
+  // Helper function to ensure table has mobile wrapper
+  wrapTableForMobile: (tableElement) => {
+    if (!tableElement.parentElement.classList.contains('table-wrapper')) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'table-wrapper';
+      tableElement.parentNode.insertBefore(wrapper, tableElement);
+      wrapper.appendChild(tableElement);
+    }
+  },
+
   legend: () => {
     try {
       const table = document.getElementById('legendTable');
       if (!table) {
         throw new Error('Legend table element not found');
       }
+      
+      // Ensure mobile wrapper
+      rendering.wrapTableForMobile(table);
       
       const filteredIds = search.getFilteredShowIds();
       const nums = filteredIds.sort((a, b) => a - b);
@@ -530,7 +543,7 @@ const rendering = {
         indicator.innerHTML = `<span class="muted">Search results for "${currentSearchTerm}": ${nums.length} shows found</span>`;
         
         if (!document.getElementById('searchResultsIndicator')) {
-          table.parentNode.insertBefore(indicator, table);
+          table.parentNode.parentNode.insertBefore(indicator, table.parentNode);
         }
       } else {
         const indicator = document.getElementById('searchResultsIndicator');
@@ -654,7 +667,7 @@ const rendering = {
       const filteredIdSet = new Set(filteredIds);
       
       const dayMap = dataProcessing.byDay();
-      let html = '<table><thead><tr>' + CONFIG.DAY_ORDER.map(d => `<th>${d}</th>`).join('') + '</tr></thead><tbody><tr>';
+      let html = '<div class="table-wrapper"><table><thead><tr>' + CONFIG.DAY_ORDER.map(d => `<th>${d}</th>`).join('') + '</tr></thead><tbody><tr>';
       
       for (let i = 0; i < 7; i++) {
         const dayDate = new Date(startOfWeek);
@@ -683,7 +696,7 @@ const rendering = {
           
         html += `<td class="shows">${items.length > 0 ? items.join('<br>') : '<em>No shows</em>'}</td>`;
       }
-      html += '</tr></tbody></table>';
+      html += '</tr></tbody></table></div>';
       
       // Add search indicator if searching
       if (currentSearchTerm) {
