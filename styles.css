@@ -588,8 +588,8 @@ span:hover {
 }
 
 .hulu::before {
-  content: "📺 ";
-  margin-right: 2px;
+  content: "";
+  margin-right: 0;
 }
 
 .peacock { 
@@ -598,8 +598,8 @@ span:hover {
 }
 
 .peacock::before {
-  content: "🦚 ";
-  margin-right: 2px;
+  content: "";
+  margin-right: 0;
 }
 
 .paramount { 
@@ -608,8 +608,8 @@ span:hover {
 }
 
 .paramount::before {
-  content: "⛰️ ";
-  margin-right: 2px;
+  content: "";
+  margin-right: 0;
 }
 
 /* UI Components */
@@ -786,11 +786,11 @@ span:hover {
   background: #52d4b0;
 }
 
-/* Network logos - using emoji/symbols */
-.abc-logo::before { content: "🅰️"; margin-right: 4px; }
-.nbc-logo::before { content: "🦚"; margin-right: 4px; }
-.cbs-logo::before { content: "👁️"; margin-right: 4px; }
-.fox-logo::before { content: "🦊"; margin-right: 4px; }
+/* Network logos - no icons */
+.abc-logo::before { content: ""; margin-right: 0; }
+.nbc-logo::before { content: ""; margin-right: 0; }
+.cbs-logo::before { content: ""; margin-right: 0; }
+.fox-logo::before { content: ""; margin-right: 0; }
 
 .abc-logo, .nbc-logo, .cbs-logo, .fox-logo {
   display: inline-flex;
