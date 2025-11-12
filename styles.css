@@ -680,6 +680,31 @@ span:hover {
   transition-duration: 0.1s;
 }
 
+/* History Controls */
+.history-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn--icon {
+  padding: 6px 10px;
+  min-width: auto;
+}
+
+.history-status {
+  font-size: 11px;
+  color: var(--muted);
+  margin-left: 4px;
+  white-space: nowrap;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 /* Mobile touch feedback */
 @media (max-width: 768px) {
   .btn:hover {

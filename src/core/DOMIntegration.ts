@@ -26,6 +26,9 @@ export interface DOMElements {
   editor: HTMLElement | null;
   loadPaste: HTMLButtonElement | null;
   pasteJson: HTMLTextAreaElement | null;
+  undoBtn: HTMLButtonElement | null;
+  redoBtn: HTMLButtonElement | null;
+  historyStatus: HTMLElement | null;
 }
 
 export interface ViewMode {
@@ -69,6 +72,7 @@ export class DOMIntegration {
       // Setup reactive subscriptions if ReactiveShowManager is available
       if (this.reactiveShowManager) {
         this.setupReactiveSubscriptions();
+        this.updateHistoryButtons(); // Initialize history button states
         logger.info('Reactive subscriptions enabled');
       } else {
         logger.warn('ReactiveShowManager not available - using legacy mode');
@@ -113,6 +117,7 @@ export class DOMIntegration {
         this.renderWeekView();
       }
       this.renderLegend(); // Update legend when shows change
+      this.updateHistoryButtons(); // Update history buttons after state changes
     });
     this.unsubscribers.push(unsubFilteredShows);
 
@@ -120,6 +125,7 @@ export class DOMIntegration {
     const unsubShows = this.reactiveShowManager.subscribeToShows(() => {
       logger.debug('Shows changed - updating editor');
       this.renderEditor();
+      this.updateHistoryButtons(); // Update history buttons after state changes
     });
     this.unsubscribers.push(unsubShows);
 
@@ -132,6 +138,7 @@ export class DOMIntegration {
         this.renderWeekView();
       }
       this.renderLegend();
+      this.updateHistoryButtons(); // Update history buttons after state changes
     });
     this.unsubscribers.push(unsubFilters);
 
@@ -158,7 +165,10 @@ export class DOMIntegration {
       editWrap: document.getElementById('editWrap'),
       editor: document.getElementById('editor'),
       loadPaste: document.getElementById('loadPaste') as HTMLButtonElement,
-      pasteJson: document.getElementById('pasteJson') as HTMLTextAreaElement
+      pasteJson: document.getElementById('pasteJson') as HTMLTextAreaElement,
+      undoBtn: document.getElementById('undoBtn') as HTMLButtonElement,
+      redoBtn: document.getElementById('redoBtn') as HTMLButtonElement,
+      historyStatus: document.getElementById('historyStatus')
     };
   }
 
@@ -226,6 +236,29 @@ export class DOMIntegration {
       element?.addEventListener('change', () => {
         this.handleFilterChange();
       });
+    });
+
+    // History controls (undo/redo)
+    this.elements.undoBtn?.addEventListener('click', () => {
+      this.handleUndo();
+    });
+
+    this.elements.redoBtn?.addEventListener('click', () => {
+      this.handleRedo();
+    });
+
+    // Keyboard shortcuts for undo/redo
+    document.addEventListener('keydown', (e) => {
+      // Ctrl+Z or Cmd+Z for undo
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        this.handleUndo();
+      }
+      // Ctrl+Y or Cmd+Y or Ctrl+Shift+Z for redo
+      else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        this.handleRedo();
+      }
     });
 
     logger.info('DOM event listeners set up successfully');
@@ -372,6 +405,65 @@ export class DOMIntegration {
       logger.info('Export completed');
     } catch (error) {
       logger.error('Export failed', error);
+    }
+  }
+
+  /**
+   * Handle undo action
+   */
+  private handleUndo(): void {
+    if (!this.reactiveShowManager) {
+      return;
+    }
+
+    if (this.reactiveShowManager.canUndo()) {
+      this.reactiveShowManager.undo();
+      this.updateHistoryButtons();
+      logger.info('Undo performed');
+    }
+  }
+
+  /**
+   * Handle redo action
+   */
+  private handleRedo(): void {
+    if (!this.reactiveShowManager) {
+      return;
+    }
+
+    if (this.reactiveShowManager.canRedo()) {
+      this.reactiveShowManager.redo();
+      this.updateHistoryButtons();
+      logger.info('Redo performed');
+    }
+  }
+
+  /**
+   * Update the state of history buttons based on available undo/redo actions
+   */
+  private updateHistoryButtons(): void {
+    if (!this.reactiveShowManager) {
+      return;
+    }
+
+    const { undoBtn, redoBtn, historyStatus } = this.elements;
+    
+    if (undoBtn) {
+      undoBtn.disabled = !this.reactiveShowManager.canUndo();
+    }
+    
+    if (redoBtn) {
+      redoBtn.disabled = !this.reactiveShowManager.canRedo();
+    }
+
+    if (historyStatus) {
+      const info = this.reactiveShowManager.getHistoryInfo();
+      if (info.size > 0 && info.currentIndex >= 0) {
+        // Show a simple indicator of history position
+        historyStatus.textContent = `${info.currentIndex + 1}/${info.size}`;
+      } else {
+        historyStatus.textContent = '';
+      }
     }
   }
 

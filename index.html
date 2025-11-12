@@ -19,6 +19,15 @@
           <span class="badge">EST · Indianapolis</span>
         </div>
         <span style="flex: 1 1 auto"></span>
+        <div class="history-controls">
+          <button id="undoBtn" class="btn btn--icon" type="button" title="Undo (Ctrl+Z)" aria-label="Undo last action" disabled>
+            ↶ Undo
+          </button>
+          <button id="redoBtn" class="btn btn--icon" type="button" title="Redo (Ctrl+Y)" aria-label="Redo last action" disabled>
+            ↷ Redo
+          </button>
+          <span id="historyStatus" class="history-status muted"></span>
+        </div>
         <button id="importBtn" class="btn" type="button">Import JSON</button>
         <button id="exportBtn" class="btn" type="button">Export JSON</button>
         <input type="file" id="importFile" accept="application/json" style="display: none" />
