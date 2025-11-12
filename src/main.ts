@@ -6,6 +6,7 @@
 import { SeasonData, ShowDatabase } from './types/index.js';
 import { Application } from './core/Application.js';
 import { ShowManager } from './modules/showManager.js';
+import { ReactiveShowManager } from './state/ReactiveShowManager.js';
 import { DOMIntegration } from './core/DOMIntegration.js';
 import { logger } from './utils/logger.js';
 
@@ -76,7 +77,13 @@ const preloadSeasonData: Record<string, SeasonData> = {
 
 // Application instances
 const app = new Application(shows);
-const showManager = new ShowManager(shows);
+const showManager = new ShowManager(shows); // Legacy - will be phased out
+const reactiveShowManager = new ReactiveShowManager(shows, {
+  persistenceKey: 'tv-show-guide-state',
+  enablePersistence: true,
+  enableHistory: true,
+  maxHistorySize: 50,
+});
 const domIntegration = new DOMIntegration(showManager);
 
 /**
@@ -90,6 +97,9 @@ function applyPreloadedData(): void {
     }
   });
   logger.info('Preloaded season data applied');
+  
+  // Update reactive show manager with preloaded data
+  reactiveShowManager.replaceAllShows(shows, 'apply preloaded data');
 }
 
 /**
@@ -102,13 +112,16 @@ const legacyApp = {
       // Apply preloaded data
       applyPreloadedData();
       
+      // Attach reactive show manager to application
+      app.setReactiveShowManager(reactiveShowManager);
+      
       // Initialize the new modular application
       await app.init();
       
       // Initialize DOM integration for UI interactions
       domIntegration.init();
       
-      logger.info('Application started using new modular architecture');
+      logger.info('Application started using new modular architecture with ReactiveShowManager');
     } catch (error) {
       logger.error('Failed to initialize application:', error);
     }
@@ -118,6 +131,7 @@ const legacyApp = {
     app.save();
   },
 
+  // Legacy ShowManager methods (kept for backward compatibility)
   getStats: (): ReturnType<typeof showManager.getStats> => {
     return showManager.getStats();
   },
@@ -128,6 +142,32 @@ const legacyApp = {
 
   getShowsByPlatform: (platform: 'hulu' | 'peacock' | 'paramount'): ReturnType<typeof showManager.getShowsByPlatform> => {
     return showManager.getShowsByPlatform(platform);
+  },
+
+  // ReactiveShowManager access methods (new reactive API)
+  getReactiveManager: (): ReactiveShowManager => {
+    return reactiveShowManager;
+  },
+
+  // Reactive versions of common operations
+  updateShow: (id: number, updates: Partial<typeof shows[number]>, action?: string): boolean => {
+    return reactiveShowManager.updateShow(id, updates, action);
+  },
+
+  undo: (): boolean => {
+    return reactiveShowManager.undo();
+  },
+
+  redo: (): boolean => {
+    return reactiveShowManager.redo();
+  },
+
+  canUndo: (): boolean => {
+    return reactiveShowManager.canUndo();
+  },
+
+  canRedo: (): boolean => {
+    return reactiveShowManager.canRedo();
   }
 };
 
@@ -142,6 +182,7 @@ if (document.readyState === 'loading') {
 export { 
   app, 
   showManager, 
+  reactiveShowManager,
   shows, 
   legacyApp as appLegacy 
 };

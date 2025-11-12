@@ -6,6 +6,7 @@
 import { ShowDatabase } from '../types/index.js';
 import { StorageService } from '../services/storageService.js';
 import { StateService } from '../services/stateService.js';
+import { ReactiveShowManager } from '../state/ReactiveShowManager.js';
 import { logger } from '../utils/logger.js';
 import { CONFIG } from './config.js';
 import * as ShowValidation from '../validation.js';
@@ -18,6 +19,7 @@ export class Application {
   private readonly stateService: StateService;
   private readonly errorHandler: ShowValidation.ErrorHandler;
   private readonly shows: ShowDatabase;
+  private reactiveShowManager?: ReactiveShowManager;
   private initialized = false;
 
   constructor(shows: ShowDatabase) {
@@ -25,6 +27,21 @@ export class Application {
     this.storageService = new StorageService(CONFIG.STORAGE_KEY);
     this.stateService = new StateService();
     this.errorHandler = new ShowValidation.ErrorHandler();
+  }
+
+  /**
+   * Set the reactive show manager instance
+   */
+  setReactiveShowManager(manager: ReactiveShowManager): void {
+    this.reactiveShowManager = manager;
+    logger.info('ReactiveShowManager attached to Application');
+  }
+
+  /**
+   * Get the reactive show manager instance
+   */
+  getReactiveShowManager(): ReactiveShowManager | undefined {
+    return this.reactiveShowManager;
   }
 
   /**
