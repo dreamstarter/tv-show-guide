@@ -539,7 +539,7 @@ const rendering = {
 
       let rows = '';
       for (let i = 0; i < nums.length; i += 4) {
-        const cells = nums.slice(i, i + 4).map(n => {
+        let cells = nums.slice(i, i + 4).map(n => {
           const s = shows[n];
           if (!s) return '<td>Invalid show</td>';
           
