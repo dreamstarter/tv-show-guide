@@ -722,9 +722,41 @@ export class DOMIntegration {
         showEntries = showEntries.filter(({ id }) => searchIds.has(id));
       }
 
-      // Note: Week navigation currently updates the date range display
-      // Future enhancement: Filter shows by actual episode air dates when that data is available
-      // For now, shows are grouped by day of week (recurring schedule) rather than specific dates
+      // Filter shows by date range - only show if season is airing during selected week
+      const initialCount = showEntries.length;
+      showEntries = showEntries.filter(({ show }) => {
+        // If no start date, exclude show (can't determine if it's airing)
+        if (!show.start) {
+          return false;
+        }
+
+        try {
+          const seasonStart = new Date(show.start);
+          
+          // If no end date, check if season has started by the selected week
+          if (!show.end) {
+            return seasonStart <= endDate;
+          }
+
+          const seasonEnd = new Date(show.end);
+          
+          // Show is airing if its season overlaps with the selected week
+          // (season starts before week ends AND season ends after week starts)
+          const isAiring = seasonStart <= endDate && seasonEnd >= startDate;
+          
+          if (!isAiring) {
+            logger.debug(`Filtering out ${show.t}: season ${seasonStart.toLocaleDateString()} - ${seasonEnd.toLocaleDateString()} doesn't overlap with ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`);
+          }
+          
+          return isAiring;
+        } catch (error) {
+          logger.warn(`Invalid date for show ${show.t}`, error);
+          return false;
+        }
+      });
+      
+      const filteredCount = showEntries.length;
+      logger.info(`Date filtering: ${initialCount} shows -> ${filteredCount} shows airing during selected week`);
 
       // Group shows by air day
       const showsByDay: Record<string, Array<{ id: number; show: Show }>> = {
@@ -826,10 +858,12 @@ export class DOMIntegration {
       const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' };
       const weekRangeText = `${startDate.toLocaleDateString('en-US', options)} - ${endDate.toLocaleDateString('en-US', options)}`;
 
+      const weekLabel = weekOffset === 0 ? 'This Week' : weekOffset > 0 ? `${weekOffset} week${weekOffset > 1 ? 's' : ''} ahead` : `${Math.abs(weekOffset)} week${Math.abs(weekOffset) > 1 ? 's' : ''} ago`;
+
       tableHtml += `<div class="week-summary">
-        <p><strong>Weekly Schedule for ${weekRangeText}:</strong></p>
+        <p><strong>Weekly Schedule for ${weekRangeText} (${weekLabel}):</strong></p>
         <ul>
-          <li>${totalFilteredShows} shows total (after filters)</li>
+          <li>${totalFilteredShows} shows airing this week</li>
           <li>${showsWithAirDays} shows with air day information</li>
           ${showsWithoutAirDays > 0 ? `<li>${showsWithoutAirDays} shows without air day information</li>` : ''}
         </ul>
