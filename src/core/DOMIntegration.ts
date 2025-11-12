@@ -150,9 +150,12 @@ export class DOMIntegration {
 
     // Subscribe to week offset changes - updates week view and range display
     const unsubWeekOffset = this.reactiveShowManager.subscribeToWeekOffset((offset) => {
-      logger.info(`Week offset changed to ${offset} - updating week view`);
+      logger.info(`Week offset subscription fired: offset=${offset}, current view=${this.viewMode.current}`);
       if (this.viewMode.current === 'week') {
+        logger.info('Calling renderWeekView() from subscription...');
         this.renderWeekView();
+      } else {
+        logger.info('Not in week view, skipping renderWeekView()');
       }
       this.updateWeekRangeDisplay();
       this.updateHistoryButtons(); // Update history buttons after state changes
@@ -705,8 +708,9 @@ export class DOMIntegration {
     try {
       // Get current week range
       const weekOffset = this.reactiveShowManager?.getWeekOffset() || 0;
+      logger.info(`[renderWeekView] Got weekOffset from ReactiveShowManager: ${weekOffset}`);
       const { startDate, endDate } = this.getWeekRange(weekOffset);
-      logger.info(`Rendering week view with offset ${weekOffset}: ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`);
+      logger.info(`[renderWeekView] Calculated week range for offset ${weekOffset}: ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`);
 
       // Get all shows and organize by air day
       const allShows = this.showManager.getAllShows();
@@ -724,9 +728,13 @@ export class DOMIntegration {
 
       // Filter shows by date range - only show if season is airing during selected week
       const initialCount = showEntries.length;
+      logger.info(`[Date Filter] Starting with ${initialCount} shows, checking against week ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`);
+      
+      const filteredOut: string[] = [];
       showEntries = showEntries.filter(({ show }) => {
         // If no start date, exclude show (can't determine if it's airing)
         if (!show.start) {
+          filteredOut.push(`${show.t} (no start date)`);
           return false;
         }
 
@@ -735,7 +743,11 @@ export class DOMIntegration {
           
           // If no end date, check if season has started by the selected week
           if (!show.end) {
-            return seasonStart <= endDate;
+            const isAiring = seasonStart <= endDate;
+            if (!isAiring) {
+              filteredOut.push(`${show.t} (starts ${seasonStart.toLocaleDateString()}, after week ends)`);
+            }
+            return isAiring;
           }
 
           const seasonEnd = new Date(show.end);
@@ -745,18 +757,22 @@ export class DOMIntegration {
           const isAiring = seasonStart <= endDate && seasonEnd >= startDate;
           
           if (!isAiring) {
-            logger.debug(`Filtering out ${show.t}: season ${seasonStart.toLocaleDateString()} - ${seasonEnd.toLocaleDateString()} doesn't overlap with ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`);
+            filteredOut.push(`${show.t} (${seasonStart.toLocaleDateString()} - ${seasonEnd.toLocaleDateString()})`);
           }
           
           return isAiring;
         } catch (error) {
           logger.warn(`Invalid date for show ${show.t}`, error);
+          filteredOut.push(`${show.t} (invalid date)`);
           return false;
         }
       });
       
       const filteredCount = showEntries.length;
       logger.info(`Date filtering: ${initialCount} shows -> ${filteredCount} shows airing during selected week`);
+      if (filteredOut.length > 0) {
+        logger.info(`Filtered out ${filteredOut.length} shows:`, filteredOut);
+      }
 
       // Group shows by air day
       const showsByDay: Record<string, Array<{ id: number; show: Show }>> = {

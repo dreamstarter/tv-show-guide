@@ -326,6 +326,7 @@ export class ReactiveShowManager {
    */
   setWeekOffset(offset: number, action?: string): void {
     const actionDescription = action || `set week offset: ${offset}`;
+    logger.info(`ReactiveShowManager.setWeekOffset(${offset}) - action: ${actionDescription}`);
     this.stateManager.set('ui.weekOffset', offset, actionDescription);
   }
 
@@ -333,7 +334,9 @@ export class ReactiveShowManager {
    * Get current week offset
    */
   getWeekOffset(): number {
-    return this.stateManager.get<number>('ui.weekOffset') || 0;
+    const offset = this.stateManager.get<number>('ui.weekOffset') || 0;
+    logger.debug(`ReactiveShowManager.getWeekOffset() = ${offset}`);
+    return offset;
   }
 
   /**
@@ -341,8 +344,10 @@ export class ReactiveShowManager {
    */
   previousWeek(action?: string): void {
     const currentOffset = this.getWeekOffset();
+    const newOffset = currentOffset - 1;
     const actionDescription = action || 'navigate to previous week';
-    this.setWeekOffset(currentOffset - 1, actionDescription);
+    logger.info(`ReactiveShowManager.previousWeek(): ${currentOffset} -> ${newOffset}`);
+    this.setWeekOffset(newOffset, actionDescription);
   }
 
   /**
@@ -350,8 +355,10 @@ export class ReactiveShowManager {
    */
   nextWeek(action?: string): void {
     const currentOffset = this.getWeekOffset();
+    const newOffset = currentOffset + 1;
     const actionDescription = action || 'navigate to next week';
-    this.setWeekOffset(currentOffset + 1, actionDescription);
+    logger.info(`ReactiveShowManager.nextWeek(): ${currentOffset} -> ${newOffset}`);
+    this.setWeekOffset(newOffset, actionDescription);
   }
 
   /**
@@ -359,6 +366,7 @@ export class ReactiveShowManager {
    */
   currentWeek(action?: string): void {
     const actionDescription = action || 'navigate to current week';
+    logger.info(`ReactiveShowManager.currentWeek(): resetting to 0`);
     this.setWeekOffset(0, actionDescription);
   }
 
