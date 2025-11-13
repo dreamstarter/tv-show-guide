@@ -30,3 +30,5 @@ export { LegendTable } from './LegendTable.js';
 export type { LegendTableProps } from './LegendTable.js';
 export { WeekViewTable } from './WeekViewTable.js';
 export type { WeekViewTableProps } from './WeekViewTable.js';
+export { AllShowsList } from './AllShowsList.js';
+export type { AllShowsListProps } from './AllShowsList.js';
