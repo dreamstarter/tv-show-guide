@@ -1,54 +1,65 @@
-import { BaseComponent } from '../core/BaseComponent.js';
-import { debounce } from '../utils/debounce.js';
+/**
+ * SearchBox Component - Provides search functionality for TV shows
+ * 
+ * Features:
+ * - Debounced search input (300ms default)
+ * - Clear button
+ * - Minimum character threshold
+ * - Keyboard shortcuts (Enter, Escape)
+ * - Integrates with ReactiveShowManager
+ */
 
-export interface SearchBoxProps {
+import { BaseComponent, BaseProps } from './BaseComponent.js';
+import { ReactiveShowManager } from '../state/ReactiveShowManager.js';
+
+/**
+ * SearchBox component properties
+ */
+export interface SearchBoxProps extends BaseProps {
+  /** Placeholder text for input */
   placeholder?: string;
-  value?: string;
+  /** Debounce delay in milliseconds (default: 300) */
   debounceMs?: number;
+  /** Minimum characters before triggering search (default: 2) */
   minChars?: number;
+  /** Whether to auto-focus the input (default: false) */
   autoFocus?: boolean;
+  /** Whether to show the clear button (default: true) */
   showClearButton?: boolean;
+  /** Callback when search is executed */
   onSearch?: (query: string) => void;
+  /** Callback when search is cleared */
   onClear?: () => void;
-  onFocus?: () => void;
-  onBlur?: () => void;
 }
 
 /**
- * SearchBox component for searching through shows
+ * SearchBox Component - Manages show search functionality
  */
 export class SearchBox extends BaseComponent<SearchBoxProps> {
-  private debouncedSearch: (query: string) => void;
+  private showManager: ReactiveShowManager;
+  private currentValue: string = '';
+  private debounceTimeout: number | null = null;
 
-  constructor(props: SearchBoxProps) {
-    super(props, {
-      className: 'search-box',
-      attributes: {
-        'role': 'search',
-        'aria-label': 'Search shows'
-      }
-    });
-
-    // Create debounced search function
-    this.debouncedSearch = debounce(
-      (query: string) => this.handleSearch(query),
-      props.debounceMs || 300
-    );
+  /**
+   * Create a new SearchBox instance
+   */
+  constructor(props: SearchBoxProps, showManager: ReactiveShowManager) {
+    super(props);
+    this.showManager = showManager;
   }
 
   /**
    * Render the search box HTML
    */
-  render(): string {
+  protected render(): string {
     const { 
       placeholder = 'Search shows...', 
-      value = '', 
       showClearButton = true,
       autoFocus = false 
     } = this.props;
 
     return `
-      <div class="search-box-content">
+      <div class="search-box">
         <div class="search-input-wrapper">
           <div class="search-icon">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -59,15 +70,14 @@ export class SearchBox extends BaseComponent<SearchBoxProps> {
             type="text" 
             class="search-input"
             placeholder="${this.escapeHtml(placeholder)}"
-            value="${this.escapeHtml(value)}"
+            value="${this.escapeHtml(this.currentValue)}"
             ${autoFocus ? 'autofocus' : ''}
             aria-label="${this.escapeHtml(placeholder)}"
             autocomplete="off"
             spellcheck="false"
           >
-          ${showClearButton && value ? this.renderClearButton() : ''}
+          ${showClearButton && this.currentValue ? this.renderClearButton() : ''}
         </div>
-        ${this.renderSearchSuggestions()}
       </div>
     `;
   }
@@ -91,60 +101,24 @@ export class SearchBox extends BaseComponent<SearchBoxProps> {
     `;
   }
 
-  /**
-   * Render search suggestions (placeholder for future enhancement)
-   */
-  private renderSearchSuggestions(): string {
-    return `
-      <div class="search-suggestions" style="display: none;">
-        <!-- Search suggestions would go here -->
-      </div>
-    `;
-  }
+
 
   /**
-   * Escape HTML to prevent XSS
+   * Called after component is mounted
    */
-  private escapeHtml(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
-
-  /**
-   * Set up event listeners for search interactions
-   */
-  protected override setupEventListeners(): void {
+  protected override onMount(): void {
     // Input change events
-    this.addEventListener('.search-input', 'input', (event: Event) => {
-      this.handleInput(event);
-    });
-
-    // Input focus events
-    this.addEventListener('.search-input', 'focus', (event: Event) => {
-      this.handleFocus(event);
-    });
-
-    // Input blur events
-    this.addEventListener('.search-input', 'blur', (event: Event) => {
-      this.handleBlur(event);
-    });
+    const searchInput = this.query<HTMLInputElement>('.search-input');
+    if (searchInput) {
+      this.addEventListener(searchInput, 'input', this.handleInput.bind(this));
+      this.addEventListener(searchInput, 'keydown', ((e: Event) => this.handleKeyDown(e as KeyboardEvent)) as EventListener);
+    }
 
     // Clear button click
-    this.addEventListener('[data-action="clear"]', 'click', (event: Event) => {
-      event.preventDefault();
-      this.handleClear();
-    });
-
-    // Keyboard shortcuts
-    this.addEventListener('.search-input', 'keydown', (event: Event) => {
-      this.handleKeyDown(event as KeyboardEvent);
-    });
-
-    // Prevent form submission if inside a form
-    this.addEventListener('self', 'submit', (event: Event) => {
-      event.preventDefault();
-    });
+    const clearBtn = this.query<HTMLButtonElement>('[data-action="clear"]');
+    if (clearBtn) {
+      this.addEventListener(clearBtn, 'click', this.handleClear.bind(this));
+    }
   }
 
   /**
@@ -152,149 +126,98 @@ export class SearchBox extends BaseComponent<SearchBoxProps> {
    */
   private handleInput(event: Event): void {
     const target = event.target as HTMLInputElement;
+    this.currentValue = target.value;
     const query = target.value.trim();
 
-    // Update props with new value
-    this.props.value = target.value;
+    // Clear existing debounce timeout
+    if (this.debounceTimeout !== null) {
+      window.clearTimeout(this.debounceTimeout);
+    }
 
-    // Update clear button visibility
-    this.updateClearButton();
+    // Update UI to show/hide clear button
+    if (this.mounted) {
+      this.update(this.props);
+    }
 
-    // Only trigger search if meets minimum character requirement
-    const minChars = this.props.minChars || 0;
-    if (query.length >= minChars) {
-      this.debouncedSearch(query);
-    } else if (query.length === 0) {
+    const minChars = this.props.minChars ?? 2;
+    
+    if (query.length === 0) {
       // Clear search immediately when input is empty
-      this.handleSearch('');
+      this.executeSearch('');
+    } else if (query.length >= minChars) {
+      // Debounce search for non-empty queries
+      const debounceMs = this.props.debounceMs ?? 300;
+      this.debounceTimeout = window.setTimeout(() => {
+        this.executeSearch(query);
+      }, debounceMs);
     }
-
-    // Emit input change event
-    this.emit('search-input', { query, length: query.length });
   }
 
   /**
-   * Handle search execution
+   * Execute search with ReactiveShowManager
    */
-  private handleSearch(query: string): void {
-    const { onSearch } = this.props;
+  private executeSearch(query: string): void {
+    // Update show manager search term
+    this.showManager.setSearchTerm(query);
     
-    if (onSearch) {
-      onSearch(query);
+    // Notify callback
+    if (this.props.onSearch) {
+      this.props.onSearch(query);
     }
-
-    this.emit('search-execute', { query });
-  }
-
-  /**
-   * Handle input focus
-   */
-  private handleFocus(_event: Event): void {
-    const { onFocus } = this.props;
-    
-    if (onFocus) {
-      onFocus();
-    }
-
-    // Add focus class to wrapper
-    const wrapper = this.querySelector('.search-input-wrapper');
-    wrapper?.classList.add('focused');
-
-    this.emit('search-focus');
-  }
-
-  /**
-   * Handle input blur
-   */
-  private handleBlur(_event: Event): void {
-    const { onBlur } = this.props;
-    
-    if (onBlur) {
-      onBlur();
-    }
-
-    // Remove focus class from wrapper
-    const wrapper = this.querySelector('.search-input-wrapper');
-    wrapper?.classList.remove('focused');
-
-    this.emit('search-blur');
   }
 
   /**
    * Handle clear button click
    */
-  private handleClear(): void {
-    const input = this.querySelector('.search-input') as HTMLInputElement;
+  private handleClear(event: Event): void {
+    event.preventDefault();
     
+    const input = this.query<HTMLInputElement>('.search-input');
     if (input) {
       input.value = '';
-      this.props.value = '';
+      this.currentValue = '';
       
       // Update UI
-      this.updateClearButton();
+      if (this.mounted) {
+        this.update(this.props);
+      }
       
       // Focus back to input
       input.focus();
       
       // Trigger search with empty query
-      this.handleSearch('');
+      this.executeSearch('');
     }
 
-    const { onClear } = this.props;
-    if (onClear) {
-      onClear();
+    if (this.props.onClear) {
+      this.props.onClear();
     }
-
-    this.emit('search-clear');
   }
 
   /**
    * Handle keyboard interactions
    */
   private handleKeyDown(event: KeyboardEvent): void {
-    switch (event.key) {
-      case 'Escape': {
-        // Clear search on escape
-        this.handleClear();
-        break;
+    const input = event.target as HTMLInputElement;
+    
+    if (event.key === 'Escape') {
+      // Clear search on escape
+      input.value = '';
+      this.currentValue = '';
+      if (this.mounted) {
+        this.update(this.props);
       }
-        
-      case 'Enter': {
-        // Trigger immediate search on enter (bypass debounce)
-        event.preventDefault();
-        const input = event.target as HTMLInputElement;
-        this.handleSearch(input.value.trim());
-        break;
+      this.executeSearch('');
+      if (this.props.onClear) {
+        this.props.onClear();
       }
-    }
-
-    this.emit('search-keydown', { key: event.key, query: (event.target as HTMLInputElement).value });
-  }
-
-  /**
-   * Update clear button visibility
-   */
-  private updateClearButton(): void {
-    const wrapper = this.querySelector('.search-input-wrapper');
-    const clearButton = this.querySelector('.clear-button');
-    const hasValue = this.props.value && this.props.value.length > 0;
-    const showClearButton = this.props.showClearButton !== false;
-
-    if (wrapper) {
-      if (hasValue && showClearButton) {
-        if (!clearButton) {
-          // Add clear button if it doesn't exist
-          wrapper.insertAdjacentHTML('beforeend', this.renderClearButton());
-          // Re-setup event listeners for the new button
-          this.setupEventListeners();
-        }
-        wrapper.classList.add('has-clear-button');
-      } else {
-        if (clearButton) {
-          clearButton.remove();
-        }
-        wrapper.classList.remove('has-clear-button');
+    } else if (event.key === 'Enter') {
+      // Trigger immediate search on enter (bypass debounce)
+      event.preventDefault();
+      if (this.debounceTimeout !== null) {
+        window.clearTimeout(this.debounceTimeout);
       }
+      this.executeSearch(input.value.trim());
     }
   }
 
@@ -302,25 +225,35 @@ export class SearchBox extends BaseComponent<SearchBoxProps> {
    * Get current search value
    */
   getValue(): string {
-    return this.props.value || '';
+    return this.currentValue;
   }
 
   /**
    * Set search value programmatically
    */
   setValue(value: string): void {
-    const input = this.querySelector('.search-input') as HTMLInputElement;
-    
+    const input = this.query<HTMLInputElement>('.search-input');
     if (input) {
       input.value = value;
-      this.props.value = value;
-      this.updateClearButton();
-      
-      // Trigger search if value meets minimum requirements
-      const minChars = this.props.minChars || 0;
-      if (value.length >= minChars) {
-        this.handleSearch(value);
+      this.currentValue = value;
+      if (this.mounted) {
+        this.update(this.props);
       }
+      
+      const minChars = this.props.minChars ?? 2;
+      if (value.trim().length >= minChars) {
+        this.executeSearch(value.trim());
+      }
+    }
+  }
+
+  /**
+   * Clear the search input
+   */
+  clear(): void {
+    this.setValue('');
+    if (this.props.onClear) {
+      this.props.onClear();
     }
   }
 
@@ -328,22 +261,7 @@ export class SearchBox extends BaseComponent<SearchBoxProps> {
    * Focus the search input
    */
   focus(): void {
-    const input = this.querySelector('.search-input') as HTMLInputElement;
+    const input = this.query<HTMLInputElement>('.search-input');
     input?.focus();
-  }
-
-  /**
-   * Clear the search input
-   */
-  clear(): void {
-    this.handleClear();
-  }
-
-  /**
-   * Check if search input is focused
-   */
-  isFocused(): boolean {
-    const input = this.querySelector('.search-input') as HTMLInputElement;
-    return document.activeElement === input;
   }
 }
