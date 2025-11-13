@@ -12,7 +12,7 @@ export type { ShowCardProps } from './ShowCard.js';
 
 // Filter and search components
 export { FilterControls } from './FilterControls.js';
-export type { FilterControlsProps, FilterOptions } from './FilterControls.js';
+export type { FilterControlsProps, FilterState } from './FilterControls.js';
 
 export { SearchBox } from './SearchBox.js';
 export type { SearchBoxProps } from './SearchBox.js';
