@@ -28,3 +28,5 @@ export type { StatsDisplayProps, ShowStats } from './StatsDisplay.js';
 // Table components
 export { LegendTable } from './LegendTable.js';
 export type { LegendTableProps } from './LegendTable.js';
+export { WeekViewTable } from './WeekViewTable.js';
+export type { WeekViewTableProps } from './WeekViewTable.js';
