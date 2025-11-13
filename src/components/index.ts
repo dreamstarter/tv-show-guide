@@ -24,3 +24,7 @@ export type { WeekNavigatorProps } from './WeekNavigator.js';
 // Statistics and reporting components
 export { StatsDisplay } from './StatsDisplay.js';
 export type { StatsDisplayProps, ShowStats } from './StatsDisplay.js';
+
+// Table components
+export { LegendTable } from './LegendTable.js';
+export type { LegendTableProps } from './LegendTable.js';
