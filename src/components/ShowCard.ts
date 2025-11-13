@@ -1,277 +1,196 @@
-import { BaseComponent } from '../core/BaseComponent.js';
+/**
+ * ShowCard Component - Displays a single TV show with all its information
+ * 
+ * Features:
+ * - Platform chip (Hulu, Peacock, Paramount)
+ * - Network badge (ABC, NBC, CBS, FOX)
+ * - Show title with returning/ended status styling
+ * - Season information (number, start/end dates)
+ * - Air day display
+ * - Edit button with click handler
+ * 
+ * @example
+ * const card = new ShowCard({
+ *   show: myShow,
+ *   onEdit: (show) => console.log('Edit:', show)
+ * });
+ * card.mount(document.querySelector('#container')!);
+ */
+
+import { BaseComponent, BaseProps } from './BaseComponent.js';
 import { Show } from '../types/index.js';
-import { formatDate } from '../utils/dateUtils.js';
 
-// Extended interface for component usage with normalized property names
-export interface TVShow {
-  id: number;
-  name: string;
-  network: string;
-  platform: string;
-  status: string;
-  startDate?: string;
-  endDate?: string;
-  watchedEpisodes: number;
-  totalEpisodes: number;
-  isFavorite: boolean;
-}
-
-// Utility function to convert Show to TVShow
-export function showToTVShow(id: number, show: Show): TVShow {
-  return {
-    id,
-    name: show.t,
-    network: show.net,
-    platform: show.c,
-    status: show.ret ? 'Returning' : 'Ended',
-    startDate: show.start,
-    endDate: show.end,
-    watchedEpisodes: 0, // This would come from tracking data
-    totalEpisodes: show.eps || 0,
-    isFavorite: false // This would come from user preferences
-  };
-}
-
-export interface ShowCardProps {
-  show: TVShow;
-  onEdit?: (show: TVShow) => void;
-  onDelete?: (show: TVShow) => void;
-  onToggleFavorite?: (show: TVShow) => void;
-  showControls?: boolean;
+/**
+ * ShowCard component properties
+ */
+export interface ShowCardProps extends BaseProps {
+  /** The show data to display */
+  show: Show;
+  /** Optional callback when edit button is clicked */
+  onEdit?: (show: Show) => void;
+  /** Optional search term to highlight in the title */
+  searchTerm?: string;
+  /** Whether to show the edit button (default: false) */
+  showEditButton?: boolean;
 }
 
 /**
- * ShowCard component for displaying individual TV show information
+ * ShowCard Component - Displays information for a single TV show
  */
 export class ShowCard extends BaseComponent<ShowCardProps> {
+  
+  /**
+   * Create a new ShowCard instance
+   */
   constructor(props: ShowCardProps) {
-    super(props, {
-      className: 'show-card',
-      attributes: {
-        'data-show-id': props.show.id.toString(),
-        'data-show-name': props.show.name
-      }
-    });
+    super(props);
   }
 
   /**
    * Render the show card HTML
    */
-  render(): string {
-    const { show, showControls = true } = this.props;
-    const statusClass = this.getStatusClass(show.status);
-    const favoriteClass = show.isFavorite ? 'favorite' : '';
-
-    return `
-      <div class="show-card-content ${statusClass} ${favoriteClass}">
-        ${this.renderHeader()}
-        ${this.renderDetails()}
-        ${this.renderProgress()}
-        ${showControls ? this.renderControls() : ''}
-      </div>
-    `;
-  }
-
-  /**
-   * Render show header with title and favorite button
-   */
-  private renderHeader(): string {
-    const { show } = this.props;
+  protected render(): string {
+    const { show, searchTerm, showEditButton = false } = this.props;
+    
+    // Determine status class (returning or ended)
+    const statusClass = show.ret ? '' : 'ended';
+    
+    // Format platform display (capitalize)
+    const platformDisplay = show.c.charAt(0).toUpperCase() + show.c.slice(1);
+    
+    // Format season info
+    const seasonInfo = this.formatSeasonInfo(show);
+    
+    // Format air day
+    const airDay = show.air || 'TBD';
+    
+    // Highlight search term in title if provided
+    const displayTitle = searchTerm 
+      ? this.highlightSearchTerm(show.t, searchTerm)
+      : this.escapeHtml(show.t);
     
     return `
-      <div class="show-header">
-        <h3 class="show-title">${this.escapeHtml(show.name)}</h3>
-        <button class="favorite-btn" data-action="toggle-favorite" title="${show.isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
-          <span class="favorite-icon">${show.isFavorite ? '★' : '☆'}</span>
-        </button>
+      <div class="show-card__header">
+        <span class="${show.c} chip">${platformDisplay}</span>
+        ${show.net ? `<span class="${show.net.toLowerCase()}-logo network-badge">${show.net}</span>` : ''}
       </div>
+      <div class="show-card__content">
+        <h3 class="show-title ${statusClass}">${displayTitle}</h3>
+        <div class="show-card__meta">
+          <div class="show-meta-item">
+            <span class="meta-label">Air Day:</span>
+            <span class="meta-value">${airDay}</span>
+          </div>
+          ${seasonInfo ? `
+            <div class="show-meta-item">
+              <span class="meta-label">Season:</span>
+              <span class="meta-value">${seasonInfo}</span>
+            </div>
+          ` : ''}
+          <div class="show-meta-item">
+            <span class="meta-label">Status:</span>
+            <span class="meta-value status-${show.ret ? 'returning' : 'ended'}">
+              ${show.ret ? 'Returning' : 'Ended'}
+            </span>
+          </div>
+        </div>
+      </div>
+      ${showEditButton ? `
+        <div class="show-card__actions">
+          <button class="btn btn--small edit-btn" type="button" data-show-title="${this.escapeHtml(show.t)}">
+            Edit
+          </button>
+        </div>
+      ` : ''}
     `;
   }
 
   /**
-   * Render show details (network, status, dates)
+   * Format season information for display
    */
-  private renderDetails(): string {
-    const { show } = this.props;
+  private formatSeasonInfo(show: Show): string {
+    const seasonNum = show.s ? `S${show.s}` : 'S?';
     
-    return `
-      <div class="show-details">
-        ${show.network ? `<div class="show-network">${this.escapeHtml(show.network)}</div>` : ''}
-        <div class="show-status status-${show.status.toLowerCase()}">${show.status}</div>
-        ${show.startDate ? `<div class="show-date">Started: ${formatDate(new Date(show.startDate))}</div>` : ''}
-        ${show.endDate ? `<div class="show-date">Ended: ${formatDate(new Date(show.endDate))}</div>` : ''}
-      </div>
-    `;
+    if (!show.start && !show.end) {
+      return `${seasonNum}: TBD`;
+    }
+    
+    if (show.start && show.end) {
+      return `${seasonNum}: ${show.start} – ${show.end}`;
+    }
+    
+    if (show.start) {
+      return `${seasonNum}: ${show.start} – Present`;
+    }
+    
+    return `${seasonNum}`;
   }
 
   /**
-   * Render progress information
+   * Highlight search term in text
    */
-  private renderProgress(): string {
-    const { show } = this.props;
-    const progressPercent = show.totalEpisodes > 0 
-      ? Math.round((show.watchedEpisodes / show.totalEpisodes) * 100) 
-      : 0;
-
-    return `
-      <div class="show-progress">
-        <div class="progress-info">
-          <span class="progress-text">
-            ${show.watchedEpisodes} / ${show.totalEpisodes} episodes
-          </span>
-          <span class="progress-percent">${progressPercent}%</span>
-        </div>
-        <div class="progress-bar">
-          <div class="progress-fill" style="width: ${progressPercent}%"></div>
-        </div>
-      </div>
-    `;
+  private highlightSearchTerm(text: string, searchTerm: string): string {
+    if (!searchTerm) {
+      return this.escapeHtml(text);
+    }
+    
+    const escapedText = this.escapeHtml(text);
+    const escapedSearchTerm = this.escapeRegex(searchTerm);
+    const regex = new RegExp(`(${escapedSearchTerm})`, 'gi');
+    
+    return escapedText.replace(regex, '<mark>$1</mark>');
   }
 
   /**
-   * Render control buttons
+   * Escape special regex characters
    */
-  private renderControls(): string {
-    return `
-      <div class="show-controls">
-        <button class="btn btn-sm btn-primary" data-action="edit" title="Edit show">
-          Edit
-        </button>
-        <button class="btn btn-sm btn-danger" data-action="delete" title="Delete show">
-          Delete
-        </button>
-      </div>
-    `;
+  private escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   /**
-   * Get CSS class based on show status
+   * Called after component is mounted
    */
-  private getStatusClass(status: string): string {
-    const statusMap: Record<string, string> = {
-      'Watching': 'status-watching',
-      'Completed': 'status-completed',
-      'On Hold': 'status-on-hold',
-      'Plan to Watch': 'status-plan-to-watch',
-      'Dropped': 'status-dropped'
-    };
-    return statusMap[status] || 'status-unknown';
-  }
-
-  /**
-   * Escape HTML to prevent XSS
-   */
-  private escapeHtml(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
-
-  /**
-   * Set up event listeners for card interactions
-   */
-  protected override setupEventListeners(): void {
-    // Favorite toggle
-    this.addEventListener('[data-action="toggle-favorite"]', 'click', (event: Event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      this.handleFavoriteToggle();
-    });
-
-    // Edit button
-    this.addEventListener('[data-action="edit"]', 'click', (event: Event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      this.handleEdit();
-    });
-
-    // Delete button
-    this.addEventListener('[data-action="delete"]', 'click', (event: Event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      this.handleDelete();
-    });
-
-    // Card click (for selection/details)
-    this.addEventListener('self', 'click', (event: Event) => {
-      const target = event.target as HTMLElement;
-      // Only handle clicks on the card itself, not buttons
-      if (!target.closest('button')) {
-        this.handleCardClick();
+  protected override onMount(): void {
+    // Set up edit button listener if edit button is shown
+    if (this.props.showEditButton) {
+      const editBtn = this.query<HTMLButtonElement>('.edit-btn');
+      if (editBtn) {
+        this.addEventListener(editBtn, 'click', this.handleEdit.bind(this));
       }
-    });
-  }
-
-  /**
-   * Handle favorite toggle
-   */
-  private handleFavoriteToggle(): void {
-    const { show, onToggleFavorite } = this.props;
-    
-    if (onToggleFavorite) {
-      onToggleFavorite(show);
     }
-
-    // Emit custom event
-    this.emit('favorite-toggle', { show });
   }
 
   /**
-   * Handle edit action
+   * Handle edit button click
    */
-  private handleEdit(): void {
-    const { show, onEdit } = this.props;
+  private handleEdit(event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
     
-    if (onEdit) {
-      onEdit(show);
+    if (this.props.onEdit) {
+      this.props.onEdit(this.props.show);
     }
-
-    // Emit custom event
-    this.emit('show-edit', { show });
   }
 
   /**
-   * Handle delete action
+   * Update component with new show data
    */
-  private handleDelete(): void {
-    const { show, onDelete } = this.props;
-    
-    if (onDelete) {
-      onDelete(show);
-    }
-
-    // Emit custom event
-    this.emit('show-delete', { show });
+  updateShow(show: Show): void {
+    this.update({ ...this.props, show });
   }
 
   /**
-   * Handle card click
+   * Update search term highlighting
    */
-  private handleCardClick(): void {
-    const { show } = this.props;
-    
-    // Emit custom event for card selection
-    this.emit('show-select', { show });
+  updateSearchTerm(searchTerm: string): void {
+    this.update({ ...this.props, searchTerm });
   }
 
   /**
-   * Update show data
+   * Get the show data from this card
    */
-  updateShow(show: TVShow): void {
-    this.update({ show });
-  }
-
-  /**
-   * Toggle controls visibility
-   */
-  toggleControls(visible: boolean): void {
-    this.update({ showControls: visible });
-  }
-
-  /**
-   * Get show data
-   */
-  getShow(): TVShow {
+  getShow(): Show {
     return this.props.show;
   }
 }

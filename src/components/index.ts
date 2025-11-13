@@ -8,8 +8,7 @@ export type { ComponentOptions, DefaultProps, ComponentMethod, EventHandler } fr
 
 // Show display components
 export { ShowCard } from './ShowCard.js';
-export type { ShowCardProps, TVShow } from './ShowCard.js';
-export { showToTVShow } from './ShowCard.js';
+export type { ShowCardProps } from './ShowCard.js';
 
 // Filter and search components
 export { FilterControls } from './FilterControls.js';
