@@ -215,6 +215,9 @@ export class FilterControls extends BaseComponent<FilterControlsProps> {
     } else {
       this.filterState.platforms = this.filterState.platforms.filter(p => p !== platform);
     }
+    
+    // Auto-apply filters immediately
+    this.applyFilters();
   }
 
   /**
@@ -223,6 +226,9 @@ export class FilterControls extends BaseComponent<FilterControlsProps> {
   private handleNonReturningChange(event: Event): void {
     const checkbox = event.target as HTMLInputElement;
     this.filterState.showNonReturning = checkbox.checked;
+    
+    // Auto-apply filters immediately
+    this.applyFilters();
   }
 
   /**
@@ -236,6 +242,9 @@ export class FilterControls extends BaseComponent<FilterControlsProps> {
     if (this.mounted) {
       this.update(this.props);
     }
+    
+    // Auto-apply filters immediately
+    this.applyFilters();
   }
 
   /**
@@ -252,6 +261,9 @@ export class FilterControls extends BaseComponent<FilterControlsProps> {
     } else {
       this.filterState.estimateNetworks = this.filterState.estimateNetworks.filter(n => n !== network);
     }
+    
+    // Auto-apply filters immediately
+    this.applyFilters();
   }
 
   /**
@@ -304,8 +316,16 @@ export class FilterControls extends BaseComponent<FilterControlsProps> {
       this.filterState.showNonReturning ? undefined : true
     );
 
-    // Note: useEstimates and estimateNetworks would need additional ShowManager support
-    // For now, just track them in filterState for future implementation
+    // Apply network filters when useEstimates is enabled
+    if (this.filterState.useEstimates && this.filterState.estimateNetworks.length > 0) {
+      this.showManager.setNetworkFilter(this.filterState.estimateNetworks);
+    } else if (this.filterState.useEstimates) {
+      // If useEstimates is on but no networks selected, show all networks
+      this.showManager.setNetworkFilter([]);
+    } else {
+      // If useEstimates is off, clear network filter (show all networks)
+      this.showManager.setNetworkFilter([]);
+    }
     
     // Notify callback
     if (this.props.onFilterChange) {
